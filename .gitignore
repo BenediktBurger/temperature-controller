@@ -1,0 +1,16 @@
+__pycache__/
+.ipynb_checkpoints/
+Test/
+dist/
+build/
+
+.ignore*
+*.no.lnk
+DataAnalysis/da*/
+
+
+*.egg-info
+cmd.lnk
+desktop.ini
+
+data/connectionData.py
