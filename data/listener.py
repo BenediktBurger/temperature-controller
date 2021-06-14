@@ -22,14 +22,15 @@ except ModuleNotFoundError:
     from PyQt5.QtCore import pyqtSlot
     qtVersion = 5
 
-import intercom
+from devices import intercom
 
 
 class Listener(QtCore.QObject):
     """Listening on incoming intercom for new connections."""
-    signals = {'pidsChanged': QtCore.pyqtSignal(),
-               'stopController': QtCore.pyqtSignal(),
-               }
+    stopController = QtCore.pyqtSignal()
+    #signals = {'pidsChanged': QtCore.pyqtSignal(),
+    #           'stopController': QtCore.pyqtSignal(),
+    #           }
 
     def __init__(self, host=None, port=-1, threadpool=None):
         """Initialize the Thread."""

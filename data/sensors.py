@@ -67,6 +67,7 @@ class Sensors:
 
     def setTemperatures(self, data):
         """Set the current temperatures from data."""
+        return
         self.temperatures = self.multiCalc([data[0], data[1], data[3], data[5]])
 
 
@@ -106,6 +107,7 @@ class Reader(QtCore.QObject):
         """Read the values and send them to the Sensors class."""
         while not self.stop:
             data = self.com.read().split('\t')
+            print(data)
             self.dataReady.emit(data)
 
     @pyqtSlot()

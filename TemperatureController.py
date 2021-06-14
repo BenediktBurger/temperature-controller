@@ -52,7 +52,7 @@ class TemperatureController(QtCore.QObject):
         self.setupPID(self.pid2, 'pid2')
 
         # Configure the listener thread for listening intercom.
-        self.setupListener()
+        self.setupListener(settings)
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.readTimeout)
@@ -61,15 +61,17 @@ class TemperatureController(QtCore.QObject):
         self.connectDatabase()
         self.databaseTable = settings.value('database/table', defaultValue=0, type=int)
 
-    def setupListener(self):
+    def setupListener(self, settings):
         """Setup the thread listening for intercom."""
         self.listenerThread = QtCore.QThread()
-        self.listener = listener.Listener(threadpool=self.threadpool)
+        self.listener = listener.Listener(port=settings.value('listener/port', defaultValue=22001, type=int),
+                                          threadpool=self.threadpool)
         self.listener.moveToThread(self.listenerThread)
         self.listenerThread.started.connect(self.listener.listen)
         self.listenerThread.start()
         # Listener Signals.
-        self.listener.signals['stopController'].connect(self.stop)
+        #self.listener.signals['stopController'].connect(self.stop)
+        self.listener.stopController.connect(self.stop)
         # TODO connections
 
     def setupPID(self, pid, name):
@@ -81,7 +83,7 @@ class TemperatureController(QtCore.QObject):
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
         pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
-        self.pidSensors[name] = settings.value('sensor', defaultValue="", type=str)
+        self.pidSensors[name] = settings.value('sensor', defaultValue=0, type=int)
 
     @pyqtSlot()
     def stop(self):
@@ -120,10 +122,10 @@ class TemperatureController(QtCore.QObject):
     def readTimeout(self):
         """Read the sensors and calculate a pid value."""
         data = self.sensors.read()
-        output = [self.pid1(data[self.pidSensors['pid1']]),
-                  self.pid2(data[self.pidSensors['pid2']])]
+        #output = [self.pid1(data[self.pidSensors['pid1']]),
+        #          self.pid2(data[self.pidSensors['pid2']])]
         # TODO use pid values
-        self.writeDatabase(data + output)  # TODO during testing only + output
+        self.writeDatabase(data)  # TODO during testing only + output
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
