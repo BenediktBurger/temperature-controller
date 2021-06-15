@@ -17,8 +17,11 @@ except ModuleNotFoundError:
     qtVersion = 5
 import psycopg2
 from simple_pid import PID
+from tinkerforge.ip_connection import IPConnection, Error as tkError
+from tinkerforge.brick_hat import BrickHAT
+from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
 
-from data import connectionData, listener, sensors  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
+from controllerData import connectionData, listener, sensors  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
 
 
 class TemperatureController(QtCore.QObject):
@@ -32,8 +35,8 @@ class TemperatureController(QtCore.QObject):
 
         # Configure Settings
         application = QtCore.QCoreApplication.instance()
-        application.organizationName = "NLOQO"
-        application.applicationName = "TemperatureController"
+        application.setOrganizationName("NLOQO")
+        application.setApplicationName("TemperatureController")
         settings = QtCore.QSettings()
         self.settings = settings
 
@@ -43,6 +46,9 @@ class TemperatureController(QtCore.QObject):
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
         self.threadpool = QtCore.QThreadPool()
+
+        # Create the tinkerforge connection
+        self.setupTinkerforge()
 
         # Initialize sensors
         self.sensors = sensors.Sensors()
@@ -82,10 +88,12 @@ class TemperatureController(QtCore.QObject):
     @pyqtSlot(str)
     def setupPID(self, id):
         """Configure the pid controller with `id`."""
+        print("setupPID called")  # TODO debug
         pid = self.pids[id]
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{id}')
-        pid.output_limits = (0, 10)
+        pid.output_limits = (settings.value('lowerLimit', defaultValue=None, type=float),
+                             settings.value('upperLimit', defaultValue=None, type=float))
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
@@ -93,11 +101,28 @@ class TemperatureController(QtCore.QObject):
         pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
                           settings.value('lastOutput', defaultValue=None, type=float))
         self.pidSensors[id] = settings.value('sensor', defaultValue=0, type=int)
+        print("setupPID finished")  # TODO debug
+
+    def setupTinkerforge(self):
+        """Create the tinkerforge HAT and bricklets."""
+        self.tks = {}
+        settings = QtCore.QSettings()
+        settings.beginGroup('tk')
+        ipcon = IPConnection()
+        ipcon.connect("localhost", 4223)  # values for local installation
+        try:
+            self.tks['connection'] = ipcon
+            self.tks['hat'] = BrickHAT(settings.value('hat', defaultValue=None, type=str), ipcon)
+            self.tks['analogOut0'] = BrickletAnalogOutV3(settings.value('analogOut0', defaultValue=None, type=str), ipcon)
+            self.tks['analogOut1'] = BrickletAnalogOutV3(settings.value('analogOut1', defaultValue=None, type=str), ipcon)
+        except tkError as exc:
+            print(f"{type(exc.__class__)}:{exc}")
 
     @pyqtSlot()
     def stop(self):
         """Stop the controller and the application."""
         print("About to stop")
+        self.readoutTimer.stop()
         # Stop the listener.
         try:
             self.listener.stop = True
@@ -145,7 +170,7 @@ class TemperatureController(QtCore.QObject):
         output = {}
         for key in self.pids.keys():
             output[key] = self.pids[key](data[self.pidSensors[key]])
-            # TODO send it to the output
+            # TODO send it to the output. Implement manual mode
         self.writeDatabase(data + [output['0']])  # TODO during testing only + output
 
     def writeDatabase(self, data):
