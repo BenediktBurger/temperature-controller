@@ -52,9 +52,15 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.sbKp.valueChanged.connect(self.changedKp)
         self.sbKi.valueChanged.connect(self.changedKi)
         self.sbKd.valueChanged.connect(self.changedKd)
+        self.sbSensor.valueChanged.connect(self.changedSensor)
+        self.cbAutoMode.stateChanged.connect(self.changedAutoMode)
+        self.sbLastOutput.valueChanged.connect(self.changedLastOutput)
+
         self.pbGet.clicked.connect(self.getClicked)
         self.pbSet.clicked.connect(self.setClicked)
+
         self.pbComponents.clicked.connect(self.getComponents)
+        self.pbReset.clicked.connect(self.resetPID)
 
         # Connect to the controller
         self.connect()
@@ -86,7 +92,8 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Get all the values for the selected PID controller."""
         name = self.bbId.currentText()
         keys = [f"pid{name}/setpoint", f"pid{name}/Kp", f"pid{name}/Ki", f"pid{name}/Kd",
-                f"pid{name}/lowerLimit", f"pid{name}/upperLimit"]
+                f"pid{name}/lowerLimit", f"pid{name}/upperLimit", f"pid{name}/sensor",
+                f"pid{name}/autoMode", f"pid{name}/lastOutput"]
         typ, data = self.com.sendObject('GET', keys)
         self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
         self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
@@ -95,7 +102,10 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
         self.cbLowerLimit.setChecked(True if data[keys[4]] is None else False)
         self.sbUpperLimit.setValue(self.gotToFloat(data[keys[5]]))
-        self.cbUpperLimit.setChecked(True if data[keys[4]] is None else False)
+        self.cbUpperLimit.setChecked(True if data[keys[5]] is None else False)
+        self.sbSensor.setValue(int(self.gotToFloat(data[keys[6]])))
+        self.cbAutoMode.setChecked(False if data[keys[7]] is False else True)
+        self.sbLastOutput.setValue(self.gotToFloat(data[keys[8]]))
         self.changed.clear()  # Reset changed dictionary.
 
     def gotToFloat(self, received):
@@ -163,6 +173,22 @@ class ControlPanel(QtWidgets.QMainWindow):
         else:
             self.changed[f'pid{self.bbId.currentText()}/lowerLimit'] = self.sbLowerLimit.value()
 
+    @pyqtSlot(int)
+    def changedSensor(self, value):
+        """Store the Sensor in the dictionary."""
+        self.changed[f'pid{self.bbId.currentText()}/sensor'] = value
+
+    @pyqtSlot(int)
+    def changedAutoMode(self, value):
+        """Store the auto mode in the dictionary."""
+        self.changed[f'pid{self.bbId.currentText()}/autoMode'] = value
+
+    @pyqtSlot(float)
+    def changedLastOutput(self, value):
+        """Store the last output in the dictionary."""
+        self.changed[f'pid{self.bbId.currentText()}/lastOutput'] = value
+
+    # Commands
     @pyqtSlot()
     def getComponents(self):
         """Show the pid components."""

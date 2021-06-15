@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>621</width>
-    <height>392</height>
+    <width>503</width>
+    <height>429</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -43,13 +43,23 @@
         </widget>
        </item>
        <item row="1" column="0">
+        <widget class="QLabel" name="label_8">
+         <property name="text">
+          <string>Sensor</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QSpinBox" name="sbSensor"/>
+       </item>
+       <item row="2" column="0">
         <widget class="QLabel" name="label_5">
          <property name="text">
           <string>Setpoint</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="1">
+       <item row="2" column="1">
         <widget class="QDoubleSpinBox" name="sbSetpoint">
          <property name="suffix">
           <string> °C</string>
@@ -59,14 +69,14 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="0">
+       <item row="5" column="0">
         <widget class="QLabel" name="label_6">
          <property name="text">
           <string>Lower limit</string>
          </property>
         </widget>
        </item>
-       <item row="2" column="1">
+       <item row="5" column="1">
         <widget class="QWidget" name="widget" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout" stretch="1,0">
           <property name="leftMargin">
@@ -86,6 +96,9 @@
             <property name="suffix">
              <string> °C</string>
             </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
            </widget>
           </item>
           <item>
@@ -98,14 +111,14 @@
          </layout>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item row="6" column="0">
         <widget class="QLabel" name="label_7">
          <property name="text">
           <string>Upper limit</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="6" column="1">
         <widget class="QWidget" name="widget_2" native="true">
          <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,0">
           <property name="leftMargin">
@@ -125,6 +138,9 @@
             <property name="suffix">
              <string> °C</string>
             </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
            </widget>
           </item>
           <item>
@@ -137,14 +153,14 @@
          </layout>
         </widget>
        </item>
-       <item row="4" column="0">
+       <item row="7" column="0">
         <widget class="QLabel" name="label">
          <property name="text">
           <string>Kp</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="1">
+       <item row="7" column="1">
         <widget class="QDoubleSpinBox" name="sbKp">
          <property name="decimals">
           <number>4</number>
@@ -160,14 +176,14 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="0">
+       <item row="8" column="0">
         <widget class="QLabel" name="label_2">
          <property name="text">
           <string>Ki</string>
          </property>
         </widget>
        </item>
-       <item row="5" column="1">
+       <item row="8" column="1">
         <widget class="QDoubleSpinBox" name="sbKi">
          <property name="decimals">
           <number>4</number>
@@ -183,14 +199,14 @@
          </property>
         </widget>
        </item>
-       <item row="6" column="0">
+       <item row="9" column="0">
         <widget class="QLabel" name="label_3">
          <property name="text">
           <string>Kd</string>
          </property>
         </widget>
        </item>
-       <item row="6" column="1">
+       <item row="9" column="1">
         <widget class="QDoubleSpinBox" name="sbKd">
          <property name="decimals">
           <number>4</number>
@@ -206,39 +222,81 @@
          </property>
         </widget>
        </item>
-       <item row="7" column="0">
+       <item row="13" column="0">
         <widget class="QToolButton" name="pbGet">
          <property name="text">
           <string>Get</string>
          </property>
         </widget>
        </item>
-       <item row="7" column="1">
+       <item row="13" column="1">
         <widget class="QToolButton" name="pbSet">
          <property name="text">
           <string>Set</string>
          </property>
         </widget>
        </item>
-       <item row="9" column="1">
-        <widget class="QLabel" name="lbComponents">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="0">
+       <item row="15" column="0">
         <widget class="QToolButton" name="pbComponents">
          <property name="text">
           <string>Components</string>
          </property>
         </widget>
        </item>
-       <item row="10" column="1">
-        <widget class="QPushButton" name="pushButton">
+       <item row="15" column="1">
+        <widget class="QLabel" name="lbComponents">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="1">
+        <widget class="QPushButton" name="pbReset">
          <property name="text">
           <string>Reset</string>
          </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_9">
+         <property name="text">
+          <string>Last output</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QWidget" name="widget_3" native="true">
+         <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,0">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QDoubleSpinBox" name="sbLastOutput">
+            <property name="suffix">
+             <string> °C</string>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="cbAutoMode">
+            <property name="text">
+             <string>Auto</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
       </layout>
@@ -251,7 +309,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>621</width>
+     <width>503</width>
      <height>21</height>
     </rect>
    </property>
