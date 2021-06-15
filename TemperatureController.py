@@ -35,55 +35,64 @@ class TemperatureController(QtCore.QObject):
         application.organizationName = "NLOQO"
         application.applicationName = "TemperatureController"
         settings = QtCore.QSettings()
+        self.settings = settings
 
-        # Objects like timers
+        # General config
+        self.errors = {}  # error dictionary
+
+        # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
-        self.readoutTimer.start(settings.value('readoutInterval', defaultValue=5000, type=int))
         self.threadpool = QtCore.QThreadPool()
 
         # Initialize sensors
         self.sensors = sensors.Sensors()
 
         # PID controllers
-        self.pid1 = PID()
-        self.pid2 = PID()
+        self.pids = {}
+        self.pids['0'] = PID()
+        self.pids['1'] = PID()
         self.pidSensors = {}
-        self.setupPID(self.pid1, 'pid1')
-        self.setupPID(self.pid2, 'pid2')
+        for key in self.pids.keys():
+            self.setupPID(key)
 
         # Configure the listener thread for listening intercom.
         self.setupListener(settings)
 
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.readTimeout)
-        self.counter = 0
-        self.timer.start(1000)
         self.connectDatabase()
-        self.databaseTable = settings.value('database/table', defaultValue=0, type=int)
+
+        # Configure readoutTimer
+        self.readoutTimer.start(settings.value('readoutInterval', defaultValue=5000, type=int))
+        self.readoutTimer.timeout.connect(self.readTimeout)
 
     def setupListener(self, settings):
         """Setup the thread listening for intercom."""
         self.listenerThread = QtCore.QThread()
         self.listener = listener.Listener(port=settings.value('listener/port', defaultValue=22001, type=int),
-                                          threadpool=self.threadpool)
+                                          threadpool=self.threadpool, controller=self)
         self.listener.moveToThread(self.listenerThread)
         self.listenerThread.started.connect(self.listener.listen)
         self.listenerThread.start()
         # Listener Signals.
         #self.listener.signals['stopController'].connect(self.stop)
-        self.listener.stopController.connect(self.stop)
+        self.listener.signals.stopController.connect(self.stop)
+        self.listener.signals.pidChanged.connect(self.setupPID)
+        self.listener.signals.timerChanged.connect(self.setTimerInterval)
         # TODO connections
 
-    def setupPID(self, pid, name):
-        """Configure the `pid` controller with `name`."""
+    @pyqtSlot(str)
+    def setupPID(self, id):
+        """Configure the pid controller with `id`."""
+        pid = self.pids[id]
         settings = QtCore.QSettings()
-        settings.beginGroup(name)
+        settings.beginGroup(f'pid{id}')
         pid.output_limits = (0, 10)
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
         pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
-        self.pidSensors[name] = settings.value('sensor', defaultValue=0, type=int)
+        pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
+                          settings.value('lastOutput', defaultValue=None, type=float))
+        self.pidSensors[id] = settings.value('sensor', defaultValue=0, type=int)
 
     @pyqtSlot()
     def stop(self):
@@ -110,6 +119,8 @@ class TemperatureController(QtCore.QObject):
         self.stopApplication.emit()
         print("Stopped")
 
+    # CONNECTIONS
+
     def connectDatabase(self):
         """(Re)Establish a connection to the database for storing sensor data."""
         try:
@@ -118,22 +129,37 @@ class TemperatureController(QtCore.QObject):
             pass  # no database present
         self.database = psycopg2.connect(**connectionData.database)
 
+    # CONFIG
+
+    def setTimerInterval(self, id, interval):
+        """Set the interval for a timer with `id` to `interval`."""
+        # it is the only timer right now.
+        self.readoutTimer.setInterval(interval)
+
+    # OPERATION
+
     @pyqtSlot()
     def readTimeout(self):
         """Read the sensors and calculate a pid value."""
         data = self.sensors.read()
-        #output = [self.pid1(data[self.pidSensors['pid1']]),
-        #          self.pid2(data[self.pidSensors['pid2']])]
-        # TODO use pid values
-        self.writeDatabase(data)  # TODO during testing only + output
+        output = {}
+        for key in self.pids.keys():
+            output[key] = self.pids[key](data[self.pidSensors[key]])
+            # TODO send it to the output
+        self.writeDatabase(data + [output['0']])  # TODO during testing only + output
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
         # TODO add error handling and backup storage.
+        table = self.settings.value('database/table', defaultValue="", type=str)
+        if table == "":
+            print("No database table configured.")
+            self.errors['database'] = "Table not configured."
+            return
         length = len(data)
         with self.database.cursor() as cursor:
             try:
-                cursor.execute(f"INSERT INTO {self.databaseTable} VALUES (%s{', %s' * length})",
+                cursor.execute(f"INSERT INTO {table} VALUES (%s{', %s' * length})",
                                (datetime.datetime.now(), *data))
             except Exception as exc:
                 print(type(exc.__class__), exc)

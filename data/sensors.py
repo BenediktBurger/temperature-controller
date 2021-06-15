@@ -22,7 +22,7 @@ class Sensors:
 
     def __init__(self):
         """Initialize the system."""
-        self.temperatures = []
+        self.temperatures = [0]
         self.signals = SensorSignals()
         # Initialize the reader class
         self.thread = QtCore.QThread()
@@ -46,7 +46,11 @@ class Sensors:
 
     def calculateTemperature(self, voltage):
         """Convert the `voltage` in mV to a temperature in °C."""
-        voltage = float(voltage)
+        try:
+            voltage = float(voltage)
+        except Exception as exc:
+            print(exc)
+            return 0
         voltage /= 1024  # to get a relative voltage to the maximum
         # now according to a Labview program:
         voltage = voltage / (1 - voltage)
@@ -67,8 +71,8 @@ class Sensors:
 
     def setTemperatures(self, data):
         """Set the current temperatures from data."""
-        return
         self.temperatures = self.multiCalc([data[0], data[1], data[3], data[5]])
+        print(self.temperatures)
 
 
 class SensorSignals(QtCore.QObject):
@@ -106,11 +110,31 @@ class Reader(QtCore.QObject):
     def listen(self):
         """Read the values and send them to the Sensors class."""
         while not self.stop:
-            data = self.com.read().split('\t')
-            print(data)
-            self.dataReady.emit(data)
+            try:
+                data = self.com.read().split('\t')
+            except UnicodeDecodeError:
+                pass
+            else:
+                #print(data)
+                self.dataReady.emit(data)
 
     @pyqtSlot()
     def close(self):
         """Close the connection."""
         self.com.close()
+
+
+class Dummy:
+    """Just a dummy class for testing."""
+
+    def __init__(self):
+        """Initialize"""
+        self.temperatures = [20, 21, 22, 23]
+
+    def read(self):
+        return self.temperatures
+
+    def close(self):
+        pass
+
+
