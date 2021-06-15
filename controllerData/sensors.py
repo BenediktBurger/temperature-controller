@@ -18,6 +18,61 @@ import pyvisa
 
 
 class Sensors:
+    """Readout sensors"""
+
+    def __init__(self):
+        """Initialize the sensors"""
+        self.com = self.setup(10)
+
+    def setup(self, port):
+        """Configure the connection on `port`."""
+        rm = pyvisa.ResourceManager()
+        com = rm.open_resource(f"ASRL{port}::INSTR")
+        """
+        Arduino uses the same defaults as visa:
+            baudrate 9600
+            8 data bits
+            no parity
+            one stop bit
+        """
+        com.read_termination = "\r\n"
+        com.write_termination = "\n"
+        com.timeout = 1000
+        return com
+
+    def read(self):
+        """Request the sensor data."""
+        data = self.com.query("r").split("\t")
+        # aux, main, cold, setpoint
+        return self.multiCalc([data[2], data[1], data[0], data[3]])
+
+    def calculateTemperature(self, voltage):
+        """Convert the `voltage` in mV to a temperature in °C."""
+        try:
+            voltage = float(voltage)
+        except Exception as exc:
+            print(exc)
+            raise
+        voltage /= 1024  # to get a relative voltage to the maximum
+        # now according to a Labview program:
+        voltage = voltage / (1 - voltage)
+        if voltage >= 3.277:
+            pars = [3.357042, 2.5214848, 3.3743283, -6.4957311]
+        elif voltage >= 0.06816:
+            pars = [3.354017, 2.5617244, 2.1400943, -7.2405219]
+        else:
+            pars = [3.3536166, 2.53772, 0.85433271, -8.7912262]
+        return 1 / (pars[0] * 1E-3 + pars[1] * 1E-4 * np.log(voltage) + pars[2] * 1E-6 * (np.log(voltage))**2 + pars[3] * 1E-8 * (np.log(voltage))**3) - 273.15
+
+    def multiCalc(self, voltages):
+        """Convert an iterable `voltages` of strings to temperatures."""
+        temperatures = []
+        for voltage in voltages:
+            temperatures.append(self.calculateTemperature(voltage))
+        return temperatures
+
+
+class Sensors2:
     """Readout class for sensors."""
 
     def __init__(self):

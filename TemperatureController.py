@@ -17,11 +17,15 @@ except ModuleNotFoundError:
     qtVersion = 5
 import psycopg2
 from simple_pid import PID
-from tinkerforge.ip_connection import IPConnection, Error as tkError
-from tinkerforge.brick_hat import BrickHAT
-from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
+try:
+    from tinkerforge.ip_connection import IPConnection, Error as tkError
+    from tinkerforge.brick_hat import BrickHAT
+    from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
+except ModuleNotFoundError:
+    tk = False
 
-from controllerData import connectionData, listener, sensors  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
+from controllerData import connectionData  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
+from controllerData import listener, sensors
 
 
 class TemperatureController(QtCore.QObject):
@@ -79,16 +83,13 @@ class TemperatureController(QtCore.QObject):
         self.listenerThread.started.connect(self.listener.listen)
         self.listenerThread.start()
         # Listener Signals.
-        #self.listener.signals['stopController'].connect(self.stop)
         self.listener.signals.stopController.connect(self.stop)
         self.listener.signals.pidChanged.connect(self.setupPID)
         self.listener.signals.timerChanged.connect(self.setTimerInterval)
-        # TODO connections
 
     @pyqtSlot(str)
     def setupPID(self, id):
         """Configure the pid controller with `id`."""
-        print("setupPID called")  # TODO debug
         pid = self.pids[id]
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{id}')
@@ -101,10 +102,11 @@ class TemperatureController(QtCore.QObject):
         pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
                           settings.value('lastOutput', defaultValue=None, type=float))
         self.pidSensors[id] = settings.value('sensor', defaultValue=0, type=int)
-        print("setupPID finished")  # TODO debug
 
     def setupTinkerforge(self):
         """Create the tinkerforge HAT and bricklets."""
+        if not tk:
+            return
         self.tks = {}
         settings = QtCore.QSettings()
         settings.beginGroup('tk')
