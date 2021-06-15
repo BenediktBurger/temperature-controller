@@ -48,6 +48,7 @@ validCommands = (
     'ERR',  # an error message (pickled)/ascii
     'ECO',  # echo back the message
     'SAV',  # save storage to disk
+    'CMD',  # execute some command
     'OFF',  # tell the other side to switch off
     # Data communication with pickled objects
     'GET',  # get variables (pickled iterable): response is SET
