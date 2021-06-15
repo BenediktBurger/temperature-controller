@@ -13,4 +13,4 @@ DataAnalysis/da*/
 cmd.lnk
 desktop.ini
 
-data/connectionData.py
+controllerData/connectionData.py
