@@ -61,7 +61,8 @@ class TemperatureController(QtCore.QObject):
         self.pids = {}
         self.pids['0'] = PID()
         self.pids['1'] = PID()
-        self.pidSensors = {}
+        self.pidSensor = {}  # the main sensor of the PID
+        self.pidState = {}  # state of the corresponding output: 0 off, 1 manual, 2 pid
         for key in self.pids.keys():
             self.setupPID(key)
 
@@ -77,6 +78,7 @@ class TemperatureController(QtCore.QObject):
     def setupListener(self, settings):
         """Setup the thread listening for intercom."""
         self.listenerThread = QtCore.QThread()
+        self.stopSignal.connect(self.listenerThread.quit)
         self.listener = listener.Listener(port=settings.value('listener/port', defaultValue=22001, type=int),
                                           threadpool=self.threadpool, controller=self)
         self.listener.moveToThread(self.listenerThread)
@@ -86,13 +88,15 @@ class TemperatureController(QtCore.QObject):
         self.listener.signals.stopController.connect(self.stop)
         self.listener.signals.pidChanged.connect(self.setupPID)
         self.listener.signals.timerChanged.connect(self.setTimerInterval)
+        self.listener.signals.setOutput.connect(self.setOutput)
+        self.listener.signals.sensorCommand.connect(self.sendSensorCommand)
 
     @pyqtSlot(str)
-    def setupPID(self, id):
-        """Configure the pid controller with `id`."""
-        pid = self.pids[id]
+    def setupPID(self, name):
+        """Configure the pid controller with `name`."""
+        pid = self.pids[name]
         settings = QtCore.QSettings()
-        settings.beginGroup(f'pid{id}')
+        settings.beginGroup(f'pid{name}')
         pid.output_limits = (settings.value('lowerLimit', defaultValue=None, type=float),
                              settings.value('upperLimit', defaultValue=None, type=float))
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
@@ -101,7 +105,8 @@ class TemperatureController(QtCore.QObject):
         pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
         pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
                           settings.value('lastOutput', defaultValue=None, type=float))
-        self.pidSensors[id] = settings.value('sensor', defaultValue=0, type=int)
+        self.pidSensor[name] = settings.value('sensor', defaultValue="", type=str)
+        self.pidState[name] = settings.value('state', defaultValue=0, type=int)
 
     def setupTinkerforge(self):
         """Create the tinkerforge HAT and bricklets."""
@@ -130,8 +135,9 @@ class TemperatureController(QtCore.QObject):
             self.listener.stop = True
         except AttributeError:
             pass
-        self.listenerThread.quit()
+        #self.listenerThread.quit()
         self.listenerThread.wait()
+        print("Listener stopped")
 
         # Close the sensor and database
         self.sensors.close()
@@ -158,10 +164,18 @@ class TemperatureController(QtCore.QObject):
 
     # CONFIG
 
-    def setTimerInterval(self, id, interval):
-        """Set the interval for a timer with `id` to `interval`."""
+    def setTimerInterval(self, name, interval):
+        """Set the interval for a timer with `name` to `interval`."""
         # it is the only timer right now.
         self.readoutTimer.setInterval(interval)
+
+    @pyqtSlot(str)
+    def sendSensorCommand(self, command):
+        """Send a command to the sensors."""
+        try:
+            self.sensors.sendCommand(command)
+        except AttributeError:
+            print("Sensor cannot be configured.")
 
     # OPERATION
 
@@ -171,9 +185,21 @@ class TemperatureController(QtCore.QObject):
         data = self.sensors.read()
         output = {}
         for key in self.pids.keys():
-            output[key] = self.pids[key](data[self.pidSensors[key]])
-            # TODO send it to the output. Implement manual mode
-        self.writeDatabase(data + [output['0']])  # TODO during testing only + output
+            try:
+                output[key] = self.pids[key](data[self.pidSensor[key]])
+            except KeyError:
+                print(f"Pid {key} does not have a valid sensor name.")
+            else:
+                if self.pidState[key] == 2:
+                    self.setOutput(key, output[key])
+        data['output'] = output['0']  # TODO during testing only + output
+        self.writeDatabase(data)
+
+    @pyqtSlot(str, float)
+    def setOutput(self, name, value):
+        """Set the output with `name` to `value`."""
+        if name == '0' and self.pidState[name]:
+            self.sensors.setSetpoint(value)
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
@@ -183,11 +209,14 @@ class TemperatureController(QtCore.QObject):
             print("No database table configured.")
             self.errors['database'] = "Table not configured."
             return
+        columns = "timestamp"
+        for key in data.keys():
+            columns += f", {key}"
         length = len(data)
         with self.database.cursor() as cursor:
             try:
-                cursor.execute(f"INSERT INTO {table} VALUES (%s{', %s' * length})",
-                               (datetime.datetime.now(), *data))
+                cursor.execute(f"INSERT INTO {table} ({columns}) VALUES (%s{', %s' * length})",
+                               (datetime.datetime.now(), *data.values()))
             except Exception as exc:
                 print(type(exc.__class__), exc)
                 self.database.rollback()

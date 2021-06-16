@@ -81,6 +81,8 @@ class ListenerSignals(QtCore.QObject):
     stopController = QtCore.pyqtSignal()
     pidChanged = QtCore.pyqtSignal(str)
     timerChanged = QtCore.pyqtSignal(str, int)
+    setOutput = QtCore.pyqtSignal(str, float)
+    sensorCommand = QtCore.pyqtSignal(str)
 
 
 class ConnectionHandler(QtCore.QRunnable):
@@ -148,7 +150,13 @@ class ConnectionHandler(QtCore.QRunnable):
             elif command == 'reset':
                 device.reset
                 intercom.sendMessage(self.connection, 'ACK')
-            
+        if deviceName == "sensors":
+            self.signals.sensorCommand.emit(command)
+            intercom.sendMessage(self.connection, 'ACK')
+        if deviceName.startswith('out'):
+            name = deviceName[3]
+            self.signals.setOutput.emit(name, float(command))
+            intercom.sendMessage(self.connection, 'ACK')
 
     def stopController(self, content):
         """Stop the controller."""

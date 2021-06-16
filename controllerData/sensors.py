@@ -44,7 +44,15 @@ class Sensors:
         """Request the sensor data."""
         data = self.com.query("r").split("\t")
         # aux, main, cold, setpoint
-        return self.multiCalc([data[2], data[1], data[0], data[3]])
+        # return self.multiCalc([data[2], data[1], data[0], data[3]])
+        temperatures = {'cold': data[0],
+                        'main': data[1],
+                        'aux': data[2],
+                        'setpoint': data[3]
+                        }
+        for key in temperatures.keys():
+            temperatures[key] = self.calculateTemperature(temperatures[key])
+        return temperatures
 
     def calculateTemperature(self, voltage):
         """Convert the `voltage` in mV to a temperature in °C."""
@@ -70,6 +78,24 @@ class Sensors:
         for voltage in voltages:
             temperatures.append(self.calculateTemperature(voltage))
         return temperatures
+
+    def calculateSetpoint(self, temperature):
+        """Convert the `temperature` in an Arduino setpoint."""
+        pars = [1.90574605e-03, -1.09052486e-01, -9.36743448e+00, 7.84559931e+02]
+        return pars[0] * temperature**3 + pars[1] * temperature**2 + pars[2] * temperature + pars[3]
+
+    def setSetpoint(self, temperature):
+        """Set the current setpoint of the Arduino."""
+        setpoint = self.calculateSetpoint(temperature)
+        self.com.query(f"s{setpoint}")
+
+    def sendCommand(self, command):
+        """Send a command to the Arduino."""
+        self.com.query(command)
+
+    def close(self):
+        """Close the connection."""
+        self.close()
 
 
 class Sensors2:
