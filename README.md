@@ -5,6 +5,20 @@ Software zur Steuerung der Klimatisierung im Labor.
 Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TCP sockets.
 
 
+## Installation
+
+### Controller
+* TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
+* Im Ordner controllerData die datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}
+* Falls nötig die sensors.py Datei an die lokalen Begebenheiten anpassen.
+* Nötige Python Abhängigkeiten installieren.
+
+### Control Panel
+* ControlPanel.ui, ControlPanel.pyw und die Ordner *data* und *devices* müssen auf dem Rechner sein, der fernsteuert.
+* Nötige Python Abhängigkeiten installieren.
+* Programm starten und in den Settings die IP und Port des zu steuernden Rechners eingeben (Lokalhost geht nicht, es muss die Internetadresse sein).
+
+
 ## Hilfreiche Links
 
 Wichtige Informationen zu git:
