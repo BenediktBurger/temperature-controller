@@ -139,8 +139,10 @@ class TemperatureController(QtCore.QObject):
             pass
         print("Listener told to stop")
         self.stopSignal.emit()
-        self.listenerThread.wait()
-        print("Listenerthread stopped")
+        if self.listenerThread.wait(10000):
+            print("Listenerthread stopped naturally")
+        else:
+            print("Listenerthread did not stop")
 
         # Close the sensor and database
         self.sensors.close()
