@@ -23,6 +23,8 @@ try:
     from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
 except ModuleNotFoundError:
     tk = False
+else:
+    tk = True
 
 from controllerData import connectionData  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
 from controllerData import listener, sensors
@@ -59,8 +61,8 @@ class TemperatureController(QtCore.QObject):
 
         # PID controllers
         self.pids = {}
-        self.pids['0'] = PID()
-        self.pids['1'] = PID()
+        self.pids['0'] = PID(auto_mode=False)  # in order to start with the last value
+        self.pids['1'] = PID(auto_mode=False)
         self.pidSensor = {}  # the main sensor of the PID
         self.pidState = {}  # state of the corresponding output: 0 off, 1 manual, 2 pid
         for key in self.pids.keys():
@@ -135,9 +137,10 @@ class TemperatureController(QtCore.QObject):
             self.listener.stop = True
         except AttributeError:
             pass
-        #self.listenerThread.quit()
+        print("Listener told to stop")
+        self.stopSignal.emit()
         self.listenerThread.wait()
-        print("Listener stopped")
+        print("Listenerthread stopped")
 
         # Close the sensor and database
         self.sensors.close()
@@ -192,7 +195,10 @@ class TemperatureController(QtCore.QObject):
             else:
                 if self.pidState[key] == 2:
                     self.setOutput(key, output[key])
-        data['output'] = output['0']  # TODO during testing only + output
+        try:  # TODO during testing only + output
+            data['output'] = output['0']
+        except KeyError:
+            pass  # no output calculated
         self.writeDatabase(data)
 
     @pyqtSlot(str, float)
