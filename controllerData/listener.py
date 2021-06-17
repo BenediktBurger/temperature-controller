@@ -97,7 +97,11 @@ class ConnectionHandler(QtCore.QRunnable):
 
     def run(self):
         """Handle the connection"""
-        typ, content = intercom.readMessage(self.connection)
+        try:
+            typ, content = intercom.readMessage(self.connection)
+        except TypeError as exc:
+            intercom.sendMessage(self.connection, 'ERR', f"TypeError: {exc}."encode('ascii'))
+            return
         reaction = {'OFF': self.stopController,
                     'SET': self.setValue,
                     'GET': self.getValue,
