@@ -17,17 +17,9 @@ except ModuleNotFoundError:
     qtVersion = 5
 import psycopg2
 from simple_pid import PID
-try:
-    from tinkerforge.ip_connection import IPConnection, Error as tkError
-    from tinkerforge.brick_hat import BrickHAT
-    from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
-except ModuleNotFoundError:
-    tk = False
-else:
-    tk = True
 
 from controllerData import connectionData  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
-from controllerData import listener, sensors
+from controllerData import listener, ioConnection
 
 
 class TemperatureController(QtCore.QObject):
@@ -57,7 +49,7 @@ class TemperatureController(QtCore.QObject):
         self.setupTinkerforge()
 
         # Initialize sensors
-        self.sensors = sensors.Sensors()
+        self.inputOutput = ioDefinition.InputOutput()
 
         # PID controllers
         self.pids = {}
@@ -110,23 +102,6 @@ class TemperatureController(QtCore.QObject):
         self.pidSensor[name] = settings.value('sensor', defaultValue="", type=str)
         self.pidState[name] = settings.value('state', defaultValue=0, type=int)
 
-    def setupTinkerforge(self):
-        """Create the tinkerforge HAT and bricklets."""
-        if not tk:
-            return
-        self.tks = {}
-        settings = QtCore.QSettings()
-        settings.beginGroup('tk')
-        ipcon = IPConnection()
-        ipcon.connect("localhost", 4223)  # values for local installation
-        try:
-            self.tks['connection'] = ipcon
-            self.tks['hat'] = BrickHAT(settings.value('hat', defaultValue=None, type=str), ipcon)
-            self.tks['analogOut0'] = BrickletAnalogOutV3(settings.value('analogOut0', defaultValue=None, type=str), ipcon)
-            self.tks['analogOut1'] = BrickletAnalogOutV3(settings.value('analogOut1', defaultValue=None, type=str), ipcon)
-        except tkError as exc:
-            print(f"{type(exc.__class__)}:{exc}")
-
     @pyqtSlot()
     def stop(self):
         """Stop the controller and the application."""
@@ -178,7 +153,7 @@ class TemperatureController(QtCore.QObject):
     def sendSensorCommand(self, command):
         """Send a command to the sensors."""
         try:
-            self.sensors.sendCommand(command)
+            self.inputOutput.executeCommand(command)
         except AttributeError:
             print("Sensor cannot be configured.")
 
@@ -187,7 +162,7 @@ class TemperatureController(QtCore.QObject):
     @pyqtSlot()
     def readTimeout(self):
         """Read the sensors and calculate a pid value."""
-        data = self.sensors.read()
+        data = self.inputOutput.getSensors()
         output = {}
         for key in self.pids.keys():
             try:
@@ -205,9 +180,9 @@ class TemperatureController(QtCore.QObject):
 
     @pyqtSlot(str, float)
     def setOutput(self, name, value):
-        """Set the output with `name` to `value`."""
-        if name == '0' and self.pidState[name]:
-            self.sensors.setSetpoint(value)
+        """Set the output with `name` to `value` if the state allows it."""
+        if self.pidState[name]:
+            self.inputOutput.setOutput(name, value)
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
