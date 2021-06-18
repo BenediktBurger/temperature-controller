@@ -112,7 +112,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         message.setWindowTitle("Communication error")
         message.setText("A communication error occurred, please check the connection settings and whether the temperature controller is running.")
         if exc is not None:
-            message.setDetailedText(f"{type(exc).__name__)}: {exc}")
+            message.setDetailedText(f"{type(exc).__name__}: {exc}")
         message.exec()
 
     # General settings
