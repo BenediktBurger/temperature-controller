@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Main file of the temperature controller for the lab.
 
@@ -111,10 +112,7 @@ class TemperatureController(QtCore.QObject):
             pass
         print("Listener told to stop")
         self.stopSignal.emit()
-        if self.listenerThread.wait(10000):
-            print("Listenerthread stopped naturally")
-        else:
-            print("Listenerthread did not stop")
+        self.listenerThread.wait(10000)  # timeout in ms
 
         # Close the sensor and database
         self.inputOutput.close()
@@ -127,7 +125,7 @@ class TemperatureController(QtCore.QObject):
             connectionType = QtCore.Qt.QueuedConnection
         self.stopApplication.connect(QtCore.QCoreApplication.instance().quit, type=connectionType)
         self.stopApplication.emit()
-        print("Stopped")
+        print("Stopped.")
 
     # CONNECTIONS
 
@@ -198,7 +196,7 @@ class TemperatureController(QtCore.QObject):
                 cursor.execute(f"INSERT INTO {table} ({columns}) VALUES (%s{', %s' * length})",
                                (datetime.datetime.now(), *data.values()))
             except Exception as exc:
-                print(type(exc.__class__), exc)
+                print(f"Database error {type(exc).__name__}: {exc}.")
                 self.database.rollback()
             else:
                 self.database.commit()

@@ -19,9 +19,9 @@ except ModuleNotFoundError:
     from PyQt5 import QtCore
     from PyQt5.QtCore import pyqtSlot
     qtVersion = 5
-import pyvisa
+import pyvisa  # just for Arduino
 
-try:
+try:  # Tinkerforge for sensors/output
     from tinkerforge.ip_connection import IPConnection, Error as tfError
     from tinkerforge.brick_hat import BrickHAT
     from tinkerforge.bricklet_air_quality import BrickletAirQuality
