@@ -40,11 +40,11 @@ class Listener(QtCore.QObject):
             sock.connect(("8.8.8.8", 80))  # just a reliable server
             host = sock.getsockname()[0]
             sock.close()
-        print(f"Listener init at {host}:{port}.")
+        print(f"Listener initialized at {host}:{port}.")
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # die Adresse sofort wieder benutzen, nicht den 2 Minuten Timer nach Stop des vorherigen Servers warten
         listener.bind((host, port))
-        listener.settimeout(5)
+        listener.settimeout(3)
         listener.listen(1)
         self.listener = listener
         self.stop = False
@@ -62,18 +62,17 @@ class Listener(QtCore.QObject):
 
     def listen(self):
         """Listen for connections and emit it via signals."""
-        print("start listen")
         while not self.stop:
             try:
                 connection, addr = self.listener.accept()
             except socket.timeout:
                 pass
             else:
-                print(addr)
+                # print(addr)
                 handler = ConnectionHandler(connection, self.signals, self.controller)
                 self.threadpool.start(handler)
         self.listener.close()
-        print("listen stopped")
+        print("Listen stopped to listen.")
 
 
 class ListenerSignals(QtCore.QObject):

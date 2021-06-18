@@ -1,0 +1,12 @@
+[Unit]
+Description=Temperature Controller
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/temperature-controller/TemperatureController.py
+# immediate output to the syslog:
+Environment=PYTHONUNBUFFERED=1
+ExecStop=/usr/bin/python3 /home/pi/temperature-controller/controllerData/stopController.py
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
