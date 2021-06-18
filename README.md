@@ -10,7 +10,7 @@ Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TC
 ### Controller
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
 * Im Ordner controllerData die datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}
-* Falls nötig die sensors.py Datei an die lokalen Begebenheiten anpassen.
+* Falls nötig die ioDefinition.py Datei an die lokalen Begebenheiten anpassen.
 * Nötige Python Abhängigkeiten installieren.
 
 ### Control Panel
