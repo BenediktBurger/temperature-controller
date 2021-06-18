@@ -39,7 +39,7 @@ else:
                2115: BrickletAnalogOutV3,
                2123: BrickletOneWire,
                2113: BrickletTemperatureV2,
-              }
+               }
 
 
 class InputOutput:
@@ -150,7 +150,6 @@ class InputOutput:
         elif name == '1':
             try:
                 assert value < 12000, "Maximum voltage 12 V."
-                uid = 
             except AssertionError as exc:
                 print(exc)
                 return
