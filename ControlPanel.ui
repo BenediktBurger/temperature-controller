@@ -6,15 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>291</width>
-    <height>552</height>
+    <width>249</width>
+    <height>686</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Temperature Controller Control Panel</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0">
     <item>
      <widget class="QGroupBox" name="gbGeneral">
       <property name="title">
@@ -85,7 +85,129 @@
      </widget>
     </item>
     <item>
+     <widget class="QGroupBox" name="groupBox">
+      <property name="title">
+       <string>Direct control</string>
+      </property>
+      <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,0">
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_14">
+         <property name="text">
+          <string>Output 0</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_15">
+         <property name="text">
+          <string>Output 1</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QDoubleSpinBox" name="sbOut0">
+         <property name="decimals">
+          <number>4</number>
+         </property>
+         <property name="minimum">
+          <double>-100.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>100.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="sbOut1">
+         <property name="decimals">
+          <number>4</number>
+         </property>
+         <property name="minimum">
+          <double>-100.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>100.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QPushButton" name="pbOut1">
+         <property name="toolTip">
+          <string>Set the output to this value.</string>
+         </property>
+         <property name="text">
+          <string>Set</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QPushButton" name="pbOut0">
+         <property name="toolTip">
+          <string>Set the output to this value.</string>
+         </property>
+         <property name="text">
+          <string>Set</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="3">
+        <widget class="QPushButton" name="pbShutDown">
+         <property name="palette">
+          <palette>
+           <active>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>255</red>
+               <green>0</green>
+               <blue>0</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </active>
+           <inactive>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>255</red>
+               <green>0</green>
+               <blue>0</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </inactive>
+           <disabled>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>120</red>
+               <green>120</green>
+               <blue>120</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </disabled>
+          </palette>
+         </property>
+         <property name="toolTip">
+          <string>Shut down the temperature controller</string>
+         </property>
+         <property name="text">
+          <string>Shut down controller</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
      <widget class="QGroupBox" name="gbPID">
+      <property name="toolTip">
+       <string>Id of the PID controller.</string>
+      </property>
       <property name="title">
        <string>PID</string>
       </property>
@@ -162,8 +284,20 @@
           </property>
           <item>
            <widget class="QDoubleSpinBox" name="sbLastOutput">
+            <property name="toolTip">
+             <string>Output value to start at.</string>
+            </property>
             <property name="suffix">
-             <string> °C</string>
+             <string/>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>-100.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
             </property>
             <property name="singleStep">
              <double>0.100000000000000</double>
@@ -172,6 +306,9 @@
           </item>
           <item>
            <widget class="QCheckBox" name="cbAutoMode">
+            <property name="toolTip">
+             <string>Calculate new output values or return the last calculated one.</string>
+            </property>
             <property name="text">
              <string>Auto</string>
             </property>
@@ -204,8 +341,20 @@
           </property>
           <item>
            <widget class="QDoubleSpinBox" name="sbLowerLimit">
+            <property name="toolTip">
+             <string>Lower limit for the output.</string>
+            </property>
             <property name="suffix">
-             <string> °C</string>
+             <string/>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>-100.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
             </property>
             <property name="singleStep">
              <double>0.100000000000000</double>
@@ -214,6 +363,9 @@
           </item>
           <item>
            <widget class="QCheckBox" name="cbLowerLimit">
+            <property name="toolTip">
+             <string>No lower output limit.</string>
+            </property>
             <property name="text">
              <string>None</string>
             </property>
@@ -246,8 +398,20 @@
           </property>
           <item>
            <widget class="QDoubleSpinBox" name="sbUpperLimit">
+            <property name="toolTip">
+             <string>Upper limit for the output.</string>
+            </property>
             <property name="suffix">
-             <string> °C</string>
+             <string/>
+            </property>
+            <property name="decimals">
+             <number>3</number>
+            </property>
+            <property name="minimum">
+             <double>-100.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>100.000000000000000</double>
             </property>
             <property name="singleStep">
              <double>0.100000000000000</double>
@@ -256,6 +420,9 @@
           </item>
           <item>
            <widget class="QCheckBox" name="cbUpperLimit">
+            <property name="toolTip">
+             <string>No upper output limit.</string>
+            </property>
             <property name="text">
              <string>None</string>
             </property>
@@ -273,14 +440,17 @@
        </item>
        <item row="6" column="1">
         <widget class="QDoubleSpinBox" name="sbKp">
+         <property name="toolTip">
+          <string>Factor for the error.</string>
+         </property>
          <property name="decimals">
           <number>4</number>
          </property>
          <property name="minimum">
-          <double>-100.000000000000000</double>
+          <double>-10000.000000000000000</double>
          </property>
          <property name="maximum">
-          <double>100.000000000000000</double>
+          <double>10000.000000000000000</double>
          </property>
          <property name="singleStep">
           <double>0.100000000000000</double>
@@ -296,14 +466,17 @@
        </item>
        <item row="7" column="1">
         <widget class="QDoubleSpinBox" name="sbKi">
+         <property name="toolTip">
+          <string>Factor for the error times time in s, added up.</string>
+         </property>
          <property name="decimals">
           <number>4</number>
          </property>
          <property name="minimum">
-          <double>-100.000000000000000</double>
+          <double>-10000.000000000000000</double>
          </property>
          <property name="maximum">
-          <double>100.000000000000000</double>
+          <double>10000.000000000000000</double>
          </property>
          <property name="singleStep">
           <double>0.100000000000000</double>
@@ -319,21 +492,24 @@
        </item>
        <item row="8" column="1">
         <widget class="QDoubleSpinBox" name="sbKd">
+         <property name="toolTip">
+          <string>Factor for the error divided by time in s.</string>
+         </property>
          <property name="decimals">
           <number>4</number>
          </property>
          <property name="minimum">
-          <double>-100.000000000000000</double>
+          <double>-10000.000000000000000</double>
          </property>
          <property name="maximum">
-          <double>100.000000000000000</double>
+          <double>10000.000000000000000</double>
          </property>
          <property name="singleStep">
           <double>0.100000000000000</double>
          </property>
         </widget>
        </item>
-       <item row="9" column="0">
+       <item row="10" column="0">
         <widget class="QToolButton" name="pbGetPID">
          <property name="toolTip">
           <string>Get the PID settings.</string>
@@ -343,7 +519,7 @@
          </property>
         </widget>
        </item>
-       <item row="9" column="1">
+       <item row="10" column="1">
         <widget class="QToolButton" name="pbSetPID">
          <property name="toolTip">
           <string>Set the changed PID settings.</string>
@@ -353,7 +529,7 @@
          </property>
         </widget>
        </item>
-       <item row="10" column="0" colspan="2">
+       <item row="11" column="0" colspan="2">
         <widget class="QGroupBox" name="groupBox_3">
          <property name="title">
           <string>Components</string>
@@ -389,7 +565,7 @@
           <item row="1" column="0">
            <widget class="QPushButton" name="pbComponents">
             <property name="toolTip">
-             <string>Get the current PID components</string>
+             <string>Get the current PID components.</string>
             </property>
             <property name="text">
              <string>Get</string>
@@ -406,6 +582,38 @@
          </property>
         </widget>
        </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="label_13">
+         <property name="text">
+          <string>Output</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QComboBox" name="bbOutput">
+         <property name="toolTip">
+          <string>Whether the output should do nothing, only manual control or PID and manual control.</string>
+         </property>
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <item>
+          <property name="text">
+           <string comment="1">Off</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string comment="1">Manual</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string comment="2">PID</string>
+          </property>
+         </item>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -416,7 +624,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>291</width>
+     <width>249</width>
      <height>21</height>
     </rect>
    </property>
@@ -444,6 +652,67 @@
    </property>
   </action>
  </widget>
+ <tabstops>
+  <tabstop>leDatabaseTable</tabstop>
+  <tabstop>sbReadoutInterval</tabstop>
+  <tabstop>pbGetGeneral</tabstop>
+  <tabstop>pbSetGeneral</tabstop>
+  <tabstop>sbOut0</tabstop>
+  <tabstop>pbOut0</tabstop>
+  <tabstop>sbOut1</tabstop>
+  <tabstop>pbOut1</tabstop>
+  <tabstop>pbShutDown</tabstop>
+  <tabstop>bbId</tabstop>
+  <tabstop>leSensor</tabstop>
+  <tabstop>sbSetpoint</tabstop>
+  <tabstop>sbLastOutput</tabstop>
+  <tabstop>cbAutoMode</tabstop>
+  <tabstop>sbLowerLimit</tabstop>
+  <tabstop>cbLowerLimit</tabstop>
+  <tabstop>sbUpperLimit</tabstop>
+  <tabstop>cbUpperLimit</tabstop>
+  <tabstop>sbKp</tabstop>
+  <tabstop>sbKi</tabstop>
+  <tabstop>sbKd</tabstop>
+  <tabstop>bbOutput</tabstop>
+  <tabstop>pbGetPID</tabstop>
+  <tabstop>pbSetPID</tabstop>
+  <tabstop>pbComponents</tabstop>
+  <tabstop>pbReset</tabstop>
+ </tabstops>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>cbLowerLimit</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>sbLowerLimit</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>211</x>
+     <y>394</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>170</x>
+     <y>398</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cbUpperLimit</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>sbUpperLimit</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>198</x>
+     <y>427</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>170</x>
+     <y>425</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

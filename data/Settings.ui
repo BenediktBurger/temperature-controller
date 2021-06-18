@@ -60,7 +60,7 @@
       <item row="0" column="1">
        <widget class="QLineEdit" name="leIP">
         <property name="toolTip">
-         <string>Host IP address.</string>
+         <string>Host IP address. Leave leading zeroes blank.</string>
         </property>
         <property name="inputMask">
          <string>000.000.000.000;_</string>

@@ -8,9 +8,11 @@ created on 23.11.2020 by Benedikt Moneke
 try:
     from PyQt6 import QtCore, QtWidgets, uic
     from PyQt6.QtCore import pyqtSlot
+    qtVersion = 6
 except ModuleNotFoundError:
     from PyQt5 import QtCore, QtWidgets, uic
     from PyQt5.QtCore import pyqtSlot
+    qtVersion = 5
 import sys
 
 from devices import intercom
@@ -50,7 +52,10 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.sbReadoutInterval.valueChanged.connect(self.changedReadoutInterval)
         self.pbGetGeneral.clicked.connect(self.getGeneral)
         self.pbSetGeneral.clicked.connect(self.setGeneral)
-
+        #   Direct Control
+        self.pbOut0.clicked.connect(self.setOutput0)
+        self.pbOut1.clicked.connect(self.setOutput1)
+        self.pbShutDown.clicked.connect(self.shutDown)
         #   PID
         self.bbId.currentTextChanged.connect(self.selectPID)
         self.sbSetpoint.valueChanged.connect(self.changedSetpoint)
@@ -66,6 +71,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.sbLastOutput.valueChanged.connect(self.changedLastOutput)
         self.pbGetPID.clicked.connect(self.getPID)
         self.pbSetPID.clicked.connect(self.setPID)
+        self.bbOutput.currentIndexChanged.connect(self.changedState)
         #   PID components
         self.pbComponents.clicked.connect(self.getComponents)
         self.pbReset.clicked.connect(self.resetPID)
@@ -95,21 +101,43 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.com = intercom.Intercom(self.settings.value('IPaddress', defaultValue="127.0.0.1", type=str),
                                      self.settings.value('port', defaultValue=22001, type=int))
 
+    def showError(self, exc=None):
+        """Show an error message."""
+        message = QtWidgets.QMessageBox()
+        if qtVersion == 6:
+            icon = QtWidgets.QMessageBox.Icon.Warning
+        else:
+            icon = QtWidgets.QMessageBox.Warning
+        message.setIcon(icon)
+        message.setWindowTitle("Communication error")
+        message.setText("A communication error occurred, please check the connection settings and whether the temperature controller is running.")
+        if exc is not None:
+            message.setDetailedText(f"{type(exc).__name__)}: {exc}")
+        message.exec()
+
     # General settings
     @pyqtSlot()
     def getGeneral(self):
         """Get the general settings."""
         keys = ['database/table', 'readoutInterval']
-        typ, data = self.com.sendObject('GET', keys)
-        self.leDatabaseTable.setText(data['database/table'])
-        self.sbReadoutInterval.setValue(5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
+        try:
+            typ, data = self.com.sendObject('GET', keys)
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            self.leDatabaseTable.setText(data['database/table'])
+            self.sbReadoutInterval.setValue(5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
 
     @pyqtSlot()
     def setGeneral(self):
         """Set the changed general settings."""
         if self.changedGeneral != {}:
-            self.com.sendObject('SET', self.changedGeneral)
-            self.changedGeneral.clear()
+            try:
+                self.com.sendObject('SET', self.changedGeneral)
+            except Exception as exc:
+                self.showError(exc)
+            else:
+                self.changedGeneral.clear()
 
     @pyqtSlot()
     def changedDatabaseTable(self):
@@ -121,6 +149,43 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Store the changed readout interval in the dictionary."""
         self.changedGeneral['readoutInterval'] = value
 
+    # Direct Control
+    @pyqtSlot()
+    def setOutput0(self):
+        """Set the output to the value of the corresponding spinbox."""
+        try:
+            self.com.sendObject('CMD', ["out0", self.sbOut0.value()])
+        except Exception as exc:
+            self.showError(exc)
+
+    @pyqtSlot()
+    def setOutput1(self):
+        """Set the output to the value of the corresponding spinbox."""
+        try:
+            self.com.sendObject('CMD', ["out1", self.sbOut1.value()])
+        except Exception as exc:
+            self.showError(exc)
+
+    @pyqtSlot()
+    def shutDown(self):
+        """Ask for confirmation and send shut down command."""
+        confirmation = QtWidgets.QMessageBox()
+        confirmation.setWindowTitle("Really shut down?")
+        confirmation.setText("Do you want to shut down the temperature controller? You can not start it with this program, but have to do it on the computer itself!")
+        if qtVersion == 6:
+            icon = QtWidgets.QMessageBox.Icon.Question
+            buttons = [QtWidgets.QMessageBox.StandardButtons.Yes, QtWidgets.QMessageBox.StandardButtons.Cancel]
+        else:
+            icon = QtWidgets.QMessageBox.Question
+            buttons = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
+        confirmation.setIcon(icon)
+        confirmation.setStandardButtons(buttons[0] | buttons[1])
+        if confirmation.exec() == buttons[0]:
+            try:
+                self.com.send('OFF')
+            except Exception as exc:
+                self.showError(exc)
+
     # PID values
     @pyqtSlot()
     def getPID(self):
@@ -128,20 +193,25 @@ class ControlPanel(QtWidgets.QMainWindow):
         name = f"pid{self.bbId.currentText()}"
         keys = [f"{name}/setpoint", f"{name}/Kp", f"{name}/Ki", f"{name}/Kd",
                 f"{name}/lowerLimit", f"{name}/upperLimit", f"{name}/sensor",
-                f"{name}/autoMode", f"{name}/lastOutput"]
-        typ, data = self.com.sendObject('GET', keys)
-        self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
-        self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
-        self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
-        self.sbKd.setValue(self.gotToFloat(data[keys[3]]))
-        self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
-        self.cbLowerLimit.setChecked(True if data[keys[4]] is None else False)
-        self.sbUpperLimit.setValue(self.gotToFloat(data[keys[5]]))
-        self.cbUpperLimit.setChecked(True if data[keys[5]] is None else False)
-        self.leSensor.setText(data[keys[6]])
-        self.cbAutoMode.setChecked(False if data[keys[7]] is False else True)
-        self.sbLastOutput.setValue(self.gotToFloat(data[keys[8]]))
-        self.changedPID.clear()  # Reset changed dictionary.
+                f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state"]
+        try:
+            typ, data = self.com.sendObject('GET', keys)
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
+            self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
+            self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
+            self.sbKd.setValue(self.gotToFloat(data[keys[3]]))
+            self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
+            self.cbLowerLimit.setChecked(True if data[keys[4]] is None else False)
+            self.sbUpperLimit.setValue(self.gotToFloat(data[keys[5]]))
+            self.cbUpperLimit.setChecked(True if data[keys[5]] is None else False)
+            self.leSensor.setText(data[keys[6]])
+            self.cbAutoMode.setChecked(False if data[keys[7]] is False else True)
+            self.sbLastOutput.setValue(self.gotToFloat(data[keys[8]]))
+            self.bbOutput.setCurrentIndex(int(self.gotToFloat(data[keys[9]])))
+            self.changedPID.clear()  # Reset changed dictionary.
 
     def gotToFloat(self, received):
         """Turn a received number into a float, because sometimes it is a string"""
@@ -153,8 +223,12 @@ class ControlPanel(QtWidgets.QMainWindow):
     def setPID(self):
         """Set the changed values."""
         if self.changedPID != {}:
-            self.com.sendObject('SET', self.changedPID)
-            self.changedPID.clear()
+            try:
+                self.com.sendObject('SET', self.changedPID)
+            except Exception as exc:
+                self.showError(exc)
+            else:
+                self.changedPID.clear()
 
     @pyqtSlot(str)
     def selectPID(self, name):
@@ -224,17 +298,29 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Store the last output in the dictionary."""
         self.changedPID[f'pid{self.bbId.currentText()}/lastOutput'] = value
 
+    @pyqtSlot(int)
+    def changedState(self, value):
+        """Store the output state in the dictionary."""
+        self.changedPID[f'pid{self.bbId.currentText()}/state'] = value
+
     # Commands
     @pyqtSlot()
     def getComponents(self):
         """Show the pid components."""
         key = f"pid{self.bbId.currentText()}"
-        typ, data = self.com.sendObject('CMD', [key, "components"])
-        self.lbComponents.setText(f"{data[key+'/components']}")
+        try:
+            typ, data = self.com.sendObject('CMD', [key, "components"])
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            self.lbComponents.setText(f"{data[key+'/components']}")
 
     @pyqtSlot()
     def resetPID(self):
-        self.com.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
+        try:
+            self.com.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
+        except Exception as exc:
+            self.showError(exc)
 
 
 if __name__ == '__main__':  # if this is the started script file
