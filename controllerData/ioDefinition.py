@@ -1,10 +1,15 @@
 """
-Readout sensor class for different readouts depending on the local situation
+Define a class for input and output of the Temperature controller.
+
+classes
+-------
+InputOutput
+    Handle input and output.
 
 Created on Mon Jun 14 16:25:43 2021 by Benedikt Moneke
 """
 
-import numpy as np
+import numpy as np  # just for Arduinos
 
 try:  # Qt for nice effects.
     from PyQt6 import QtCore
@@ -23,7 +28,7 @@ try:
     from tinkerforge.bricklet_analog_in_v3 import BrickletAnalogInV3
     from tinkerforge.bricklet_analog_out_v3 import BrickletAnalogOutV3
     from tinkerforge.bricklet_one_wire import BrickletOneWire
-    from tinkerforge.bricklet_temperature import BrickletTemperature
+    from tinkerforge.bricklet_temperature_v2 import BrickletTemperatureV2
 except ModuleNotFoundError:
     tf = False
 else:
@@ -33,7 +38,7 @@ else:
                295: BrickletAnalogInV3,
                2115: BrickletAnalogOutV3,
                2123: BrickletOneWire,
-               216: BrickletTemperature,
+               2113: BrickletTemperatureV2,
               }
 
 
@@ -43,14 +48,14 @@ class InputOutput:
     # Setup and closure.
     def __init__(self):
         """Initialize the input/output"""
-        try:
+        self.setupTinkerforge()
+        try:  # Setup Arduino
             self.com = self.setupArduino("/dev/ttyACM0")  # eg-klima
         except Exception:
             self.com = self.setupArduino(10)  # Myres
-        self.setupTinkerforge()
 
     def setupArduino(self, port):
-        """Configure the connection on `port`."""
+        """Configure the serial connection on `port` for Arduino."""
         rm = pyvisa.ResourceManager()
         com = rm.open_resource(f"ASRL{port}::INSTR")
         """
@@ -66,7 +71,7 @@ class InputOutput:
         return com
 
     def setupTinkerforge(self):
-        """Create the tinkerforge HAT and bricklets."""
+        """Create the tinkerforge connection."""
         if not tf:
             return
         self.tfDevices = {}  # dictionary for the bricklets
@@ -82,7 +87,8 @@ class InputOutput:
     def deviceConnected(self, uid, connected_uid, position, hardware_version, firmware_version, device_identifier, enumeration_type):
         """Store a connected thinkerforge device in the database."""
         if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:  # AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
-            self.tfDevices[uid] = device[device_identifier](uid, self.tfCon)
+            print(f"Device connected: {uid} at {position} of type {device_identifier}.")
+            self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
             if device_identifier == BrickHAT.DEVICE_IDENTIFIER:
                 self.tfMap['HAT'] = uid
             elif device_identifier == BrickletAnalogOutV3.DEVICE_IDENTIFIER:
@@ -92,7 +98,8 @@ class InputOutput:
                     self.tfMap['analogOut1'] = uid
             elif device_identifier == BrickletAirQuality.DEVICE_IDENTIFIER:
                 self.tfMap['airQuality'] = uid
-        else:
+        else:  # Only uid and enumeration_type have valid values.
+            print(f"Device with {uid} disconnected.")
             del self.tfDevices[uid]
 
     def close(self):
@@ -108,27 +115,53 @@ class InputOutput:
 
     #Methods
     def getSensors(self):
-        """Request the sensor data."""
-        data = self.com.query("r").split("\t")
-        # aux, main, cold, setpoint
-        # return self.multiCalc([data[2], data[1], data[0], data[3]])
-        temperatures = {'cold': data[0],
-                        'main': data[1],
-                        'aux': data[2],
-                        'setpoint': data[3]
+        """Request the sensor data and return a dictionary."""
+        arduino = self.com.query("r").split("\t")
+        data = {'cold': arduino[0],
+                        'main': arduino[1],
+                        'aux': arduino[2],
+                        'setpoint': arduino[3]
                         }
-        for key in temperatures.keys():
-            temperatures[key] = self.calculateTemperature(temperatures[key])
-        return temperatures
+        for key in data.keys():
+            data[key] = self.calculateTemperature(data[key])
+        try:
+            iaq, iaqa, temp, humidity, pressure = self.tfDevics[self.tfMap['airQuality']].get_all_values()
+        except (AttributeError, KeyError):
+            pass
+        else:
+            data['airQuality'] = iaq / 100
+            data['temperature'] = temp / 100
+            data['humidity'] = humidity / 100
+            data['airPressure'] = pressure / 100
+        return data
+        # Tinkerforge:
+        # temperatureV2.get_temperature() / 100  # in °C
+        # analogInV3.get_voltage()  # in mV
+        # airQuality.get_all_values()  # air quality, air quality accuracy, temperature in 1/100°C, humidity in 1/100 %, air pressure in 1/100 hPa
+        # airQuality.get_iaq_index()  # air quality index (0-500) and its accuracy (0 bad, 3 high)
+        # airQuality.get_temperature() / 100  # in °C
+        # airQuality.get_humidity() / 100  # relative air humidity in %
+        # airQuality.get_air_pressure() / 100  # in hPa
 
     def setOutput(self, name, value):
         """Set the output with `name` to `value`."""
         if name == '0':
             self.setSetpoint(value)
+        elif name == '1':
+            try:
+                assert value < 12000, "Maximum voltage 12 V."
+                uid = 
+            except AssertionError as exc:
+                print(exc)
+                return
+            try:
+                self.tfDevices[self.tfMap['analogOut1']].setOutputVoltage(value)
+            except (AttributeError, KeyError):
+                print("analogOut1 is not connected.")
 
     # Methods for Arduino
     def executeCommand(self, command):
-        """Send a command to the Arduino."""
+        """Send `command` to the Arduino."""
         self.com.query(command)
 
     def calculateTemperature(self, voltage):

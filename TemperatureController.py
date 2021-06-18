@@ -19,7 +19,7 @@ import psycopg2
 from simple_pid import PID
 
 from controllerData import connectionData  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
-from controllerData import listener, ioConnection
+from controllerData import listener, ioDefinition
 
 
 class TemperatureController(QtCore.QObject):
@@ -44,9 +44,6 @@ class TemperatureController(QtCore.QObject):
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
         self.threadpool = QtCore.QThreadPool()
-
-        # Create the tinkerforge connection
-        self.setupTinkerforge()
 
         # Initialize sensors
         self.inputOutput = ioDefinition.InputOutput()
@@ -120,7 +117,7 @@ class TemperatureController(QtCore.QObject):
             print("Listenerthread did not stop")
 
         # Close the sensor and database
-        self.sensors.close()
+        self.inputOutput.close()
         self.database.close()
 
         # Stop the Application.
