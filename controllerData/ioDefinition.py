@@ -76,8 +76,6 @@ class InputOutput:
             return
         self.tfDevices = {}  # dictionary for the bricklets
         self.tfMap = {}  # dictionary for mapping the devices to tasks
-        settings = QtCore.QSettings()
-        settings.beginGroup('tk')
         tfCon = IPConnection()
         tfCon.connect("localhost", 4223)  # values for local installation
         self.tfCon = tfCon
@@ -99,8 +97,14 @@ class InputOutput:
             elif device_identifier == BrickletAirQuality.DEVICE_IDENTIFIER:
                 self.tfMap['airQuality'] = uid
         else:  # Only uid and enumeration_type have valid values.
-            print(f"Device with {uid} disconnected.")
-            del self.tfDevices[uid]
+            print(f"Device {uid} disconnected.")
+            try:
+                del self.tfDevices[uid]
+            except KeyError:
+                pass
+            else:
+                if uid in self.tfMap.values():
+                    self.tfMap = {key: val for key, val in self.tfMap.items() if val != uid}
 
     def close(self):
         """Close the connection."""
@@ -113,23 +117,17 @@ class InputOutput:
         except AttributeError:
             pass  # Not existent
 
-    #Methods
+    # Methods
     def getSensors(self):
         """Request the sensor data and return a dictionary."""
-        arduino = self.com.query("r").split("\t")
-        data = {'cold': arduino[0],
-                        'main': arduino[1],
-                        'aux': arduino[2],
-                        'setpoint': arduino[3]
-                        }
-        for key in data.keys():
-            data[key] = self.calculateTemperature(data[key])
+        data = {}
+        data.update(self.getArduino())
         try:
-            iaq, iaqa, temp, humidity, pressure = self.tfDevics[self.tfMap['airQuality']].get_all_values()
+            iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
         except (AttributeError, KeyError):
             pass
         else:
-            data['airQuality'] = iaq / 100
+            data['airQuality'] = iaq
             data['temperature'] = temp / 100
             data['humidity'] = humidity / 100
             data['airPressure'] = pressure / 100
@@ -154,11 +152,26 @@ class InputOutput:
                 print(exc)
                 return
             try:
-                self.tfDevices[self.tfMap['analogOut1']].setOutputVoltage(value)
+                self.tfDevices[self.tfMap['analogOut1']].set_output_voltage(value)
             except (AttributeError, KeyError):
                 print("analogOut1 is not connected.")
 
     # Methods for Arduino
+    def getArduino(self):
+        try:
+            arduino = self.com.query("r").split("\t")
+        except AttributeError:
+            return {}
+        else:
+            data = {'cold': arduino[0],
+                    'main': arduino[1],
+                    'aux': arduino[2],
+                    'setpoint': arduino[3]
+                    }
+            for key in data.keys():
+                data[key] = self.calculateTemperature(data[key])
+            return data
+
     def executeCommand(self, command):
         """Send `command` to the Arduino."""
         self.com.query(command)
@@ -204,5 +217,3 @@ class Dummy:
 
     def close(self):
         pass
-
-
