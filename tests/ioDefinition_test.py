@@ -8,8 +8,6 @@ Created on Mon Jun 21 13:11:23 2021 by Benedikt Moneke
 
 # for tests
 import pytest
-import sys
-sys.path.append('C:/Users/moneke/temperature-controller')
 
 # file to test
 from controllerData import ioDefinition
@@ -66,6 +64,24 @@ class Mock_BrickletAnalogOutV3:
         self.voltage = voltage
 
 
+@pytest.fixture
+def mock_tinkerforge(monkeypatch):
+    def returner(*args):
+        return args
+
+    monkeypatch.setattr(ioDefinition, 'devices', {297: returner, 111: returner, 2115: returner}, False)
+    monkeypatch.setattr(ioDefinition, "IPConnection", Mock_IPConnection, False)
+    monkeypatch.setattr(ioDefinition, 'BrickHAT', Mock_BrickHAT, False)
+    monkeypatch.setattr(ioDefinition, 'BrickletAirQuality', Mock_BrickletAirQuality, False)
+    monkeypatch.setattr(ioDefinition, 'BrickletAnalogOutV3', Mock_BrickletAnalogOutV3, False)
+
+
+@pytest.fixture
+def tf_device_pars():
+    """Tinkerforge device parameters."""
+    # 0: uid, 1: connected_uid, 2: position, 3: hardware_version, 4: firmware_version, 5: device_identifier, 6: enumeration_type
+    return ["abc", "def", "i", 0, 0, 1, 0]
+
 # General and tinkerforge tests.
 def test_setupTinkerforge_False(empty, monkeypatch):
     monkeypatch.setattr(ioDefinition, 'tf', False)
@@ -78,39 +94,21 @@ def test_setupTinkerforge_False(empty, monkeypatch):
                                                      (111, 'HAT'),
                                                      (2115, 'analogOut1')
                                                      ])
-def test_deviceConnected(monkeypatch, skeleton, device_identifier, name):
-    uid = "abc"
-    connected_uid = "def"
-    position = "i"
-    hardware_version = 0
-    firmware_version = 0
-    enumeration_type = 1
-
-    def returner(*args):
-        return args
-
-    monkeypatch.setattr(ioDefinition, 'devices', {297: returner, 111: returner, 2115: returner}, False)
-    monkeypatch.setattr(ioDefinition, "IPConnection", Mock_IPConnection, False)
-    monkeypatch.setattr(ioDefinition, 'BrickHAT', Mock_BrickHAT, False)
-    monkeypatch.setattr(ioDefinition, 'BrickletAirQuality', Mock_BrickletAirQuality, False)
-    monkeypatch.setattr(ioDefinition, 'BrickletAnalogOutV3', Mock_BrickletAnalogOutV3, False)
-    ioDefinition.InputOutput.deviceConnected(skeleton, uid, connected_uid, position, hardware_version, firmware_version, device_identifier, enumeration_type)
+def test_deviceConnected(mock_tinkerforge, skeleton, tf_device_pars, device_identifier, name):
+    tf_device_pars[5] = device_identifier
+    uid = tf_device_pars[0]
+    ioDefinition.InputOutput.deviceConnected(skeleton, *tf_device_pars)
     assert skeleton.tfDevices[uid] == (uid, 0)
     assert skeleton.tfMap[name] == uid
 
 
-def test_deviceDisconnected(skeleton, monkeypatch):
-    uid = 'abc'
-    connected_uid = "def"
-    position = "i"
-    hardware_version = 0
-    firmware_version = 0
-    enumeration_type = 3
-    device_identifier = 0
+def test_deviceDisconnected(skeleton, monkeypatch, tf_device_pars):
+    tf_device_pars[6] = 3
+    uid = tf_device_pars[0]
     skeleton.tfDevices[uid] = 5
     skeleton.tfMap['analogOut0'] = uid
     monkeypatch.setattr(ioDefinition, "IPConnection", Mock_IPConnection, False)
-    ioDefinition.InputOutput.deviceConnected(skeleton, uid, connected_uid, position, hardware_version, firmware_version, device_identifier, enumeration_type)
+    ioDefinition.InputOutput.deviceConnected(skeleton, *tf_device_pars)
     assert skeleton.tfDevices == {}
     assert skeleton.tfMap == {}
 

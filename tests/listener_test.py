@@ -8,28 +8,15 @@ Created on Sat Jun 19 08:17:59 2021 by Benedikt Moneke
 
 # for tests
 import pytest
-import sys
-sys.path.append('C:/Users/moneke/temperature-controller')
 
-# auxiliary for fixtures
+# auxiliary for fixtures and tests
 import pickle
+import socket
+
 from devices import intercom
 
 # file to test
 from controllerData import listener
-
-
-class Empty:
-    pass
-
-@pytest.fixture
-def empty():
-    return Empty()
-
-
-class Connection:
-    def close(self):
-        pass
 
 
 class Mock_Controller:
@@ -40,30 +27,22 @@ class Mock_Controller:
 class Mock_PID:
     components = 123
     def __init__(self):
-        global reset
-        reset = False
+        self.resetted = False
 
     def reset(self):
-        global reset
-        reset = True
+        self.resetted = True
 
 
 @pytest.fixture(autouse=True)
-def disable_network(monkeypatch):
+def disable_network(monkeypatch, connection):
     def new_sendMessage(*args, **kwargs):
         global message
         message = list(args)
 
-    def new_readMessage(connection=Connection()):
+    def new_readMessage(connection=connection):
         return typ, content
     monkeypatch.setattr(intercom, "sendMessage", lambda *args, **kwargs: new_sendMessage(*args, **kwargs))
     monkeypatch.setattr(intercom, "readMessage", lambda connection: new_readMessage(connection))
-
-
-# ConnectionHandler
-@pytest.fixture
-def conn():
-    return Connection()
 
 
 @pytest.fixture
@@ -72,8 +51,8 @@ def signals():
 
 
 @pytest.fixture
-def ch(conn, signals):
-    return listener.ConnectionHandler(conn, signals)
+def ch(connection, signals):
+    return listener.ConnectionHandler(connection, signals)
 
 
 @pytest.fixture
@@ -83,8 +62,32 @@ def chP(ch):
     return ch
 
 
+class Test_listener():
+    """Test the listener."""
+
+    @pytest.fixture(scope="class")
+    def listener(self):
+        listi = listener.Listener(host='127.0.0.1', port=12345)
+        yield listi
+        del listi
+
+    def test_init_name(self, listener):
+        assert listener.listener.getsockname() == ('127.0.0.1', 12345)
+
+    def test_init_timeout(self, listener):
+        assert listener.listener.gettimeout() == 3
+
+    def test_init_config(self, listener):
+        assert listener.listener.family == socket.AF_INET
+        assert listener.listener.type == socket.SOCK_STREAM
+
+    def test_init_invalid_port(self):
+        with pytest.raises(AssertionError):
+            listener.Listener()
+
+
 class Test_handler():
-    """Test the connectionHandler"""
+    """Test the connectionHandler."""
 
     @pytest.fixture
     def running(self):
@@ -121,7 +124,7 @@ class Test_handler():
     def test_executeCommand_pid_reset(self, chP):
         content = pickle.dumps(['pid0', "reset"])
         chP.executeCommand(content)
-        assert reset == True
+        assert chP.controller.pids['0'].resetted == True
 
     @pytest.mark.parametrize('out, value', [('0', 15.3), ('1', "10"), ('3', "17.3")])
     def test_executeCommand_output(self, ch, qtbot, out, value):
