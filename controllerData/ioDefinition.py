@@ -11,15 +11,7 @@ Created on Mon Jun 14 16:25:43 2021 by Benedikt Moneke
 
 import numpy as np  # just for Arduinos
 
-try:  # Qt for nice effects.
-    from PyQt6 import QtCore
-    from PyQt6.QtCore import pyqtSlot
-    qtVersion = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore
-    from PyQt5.QtCore import pyqtSlot
-    qtVersion = 5
-import pyvisa  # just for Arduino
+import pyvisa  # Serial communication like Arduinos
 
 try:  # Tinkerforge for sensors/output
     from tinkerforge.ip_connection import IPConnection, Error as tfError
@@ -49,26 +41,14 @@ class InputOutput:
     def __init__(self):
         """Initialize the input/output"""
         self.setupTinkerforge()
+        self.readoutMethods = []  # List of local readout methods.
+        # Local setup.
+        self.rm = pyvisa.ResourceManager()
         try:  # Setup Arduino
             self.com = self.setupArduino("/dev/ttyACM0")  # eg-klima
+            self.setupWDE(self.rm)
         except Exception:
             self.com = self.setupArduino(10)  # Myres
-
-    def setupArduino(self, port):
-        """Configure the serial connection on `port` for Arduino."""
-        rm = pyvisa.ResourceManager()
-        com = rm.open_resource(f"ASRL{port}::INSTR")
-        """
-        Arduino uses the same defaults as visa:
-            baudrate 9600
-            8 data bits
-            no parity
-            one stop bit
-        """
-        com.read_termination = "\r\n"
-        com.write_termination = "\n"
-        com.timeout = 1000
-        return com
 
     def setupTinkerforge(self):
         """Create the tinkerforge connection."""
@@ -109,19 +89,24 @@ class InputOutput:
     def close(self):
         """Close the connection."""
         try:
+            self.tfcon.disconnect()
+        except AttributeError:
+            pass  # Not existent
+        # Closure of local devices.
+        try:
             self.com.close()
         except AttributeError:
             pass  # Not existent
         try:
-            self.tfcon.disconnect()
+            self.wde.close()
         except AttributeError:
             pass  # Not existent
+        self.rm.close()  # Serial resource manager
 
     # Methods
     def getSensors(self):
         """Request the sensor data and return a dictionary."""
         data = {}
-        data.update(self.getArduino())
         try:
             iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
         except (AttributeError, KeyError):
@@ -131,6 +116,8 @@ class InputOutput:
             data['temperature'] = temp / 100
             data['humidity'] = humidity / 100
             data['airPressure'] = pressure / 100
+        for method in self.readoutMethods:  # Read locally defined sensors.
+            data.update(method())
         return data
         # Tinkerforge:
         # temperatureV2.get_temperature() / 100  # in °C
@@ -156,7 +143,25 @@ class InputOutput:
             except (AttributeError, KeyError):
                 print("analogOut1 is not connected.")
 
+    # LOCAL DEFINITIONS
+
     # Methods for Arduino
+    def setupArduino(self, port):
+        """Configure the serial connection on `port` for Arduino."""
+        com = self.rm.open_resource(f"ASRL{port}::INSTR")
+        """
+        Arduino uses the same defaults as visa:
+            baudrate 9600
+            8 data bits
+            no parity
+            one stop bit
+        """
+        com.read_termination = "\r\n"
+        com.write_termination = "\n"
+        com.timeout = 1000
+        self.readoutMethods.append(self.getArduino)
+        return com
+
     def getArduino(self):
         try:
             arduino = self.com.query("r").split("\t")
@@ -203,6 +208,27 @@ class InputOutput:
         """Set the current setpoint of the Arduino."""
         setpoint = self.calculateSetpoint(temperature)
         self.com.query(f"s{setpoint}")
+
+    # Methods for ELV USB-WDE weather sensor receiver
+    def setupWDE(self, resourceManager):
+        """Initialize the ELV wde weather sensor receiver."""
+        self.wde = resourceManager.open_resource("ASRL/dev/ttyUSB0::INSTR")
+        self.wde.read_termination = '\r\n'
+        while self.wde.bytes_in_buffer:
+            self.wde.read()
+        self.readoutMethods.append(self.getWDE)
+
+    def getWDE(self):
+        """Read the wde sensor data."""
+        data = {}
+        if self.wde.bytes_in_buffer:
+            raw = self.wde.read().replace(',','.').split(';')
+            if raw[2+1]:
+                data['experiment'] = float(raw[2+1])
+            if raw[2+5]:
+                data['outside'] = float(raw[2+5])
+                data['humidityout'] = float(raw[10+5])
+        return data
 
 
 class Dummy:

@@ -1,51 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test for the ioDefinition.py
+Test for the ioDefinition.py.
 
-Created on Mon Jun 21 13:11:23 2021
-
-@author: moneke
+Created on Mon Jun 21 13:11:23 2021 by Benedikt Moneke
 """
 
 # for tests
 import pytest
-#import pytest-qt
 import sys
 sys.path.append('C:/Users/moneke/temperature-controller')
-
-# auxiliary for fixtures
-#import pickle
-#from devices import intercom
 
 # file to test
 from controllerData import ioDefinition
 
 
-@pytest.fixture
-def io():
-    return ioDefinition.InputOutput()
-
-
-class raw():
+class Empty():
     pass
 
 
 @pytest.fixture
 def empty():
-    return raw()
-
-
-class Mock_InputOutput:
-    def __init__(self):
-        self.tfCon = 0
-        self.tfDevices = {}
-        self.tfMap = {}
+    raw = Empty()
+    raw.readoutMethods = []
+    return raw
 
 
 @pytest.fixture
-def skeleton():
-    return Mock_InputOutput()
+def skeleton(empty):
+    """Just tinkerforge ready."""
+    empty.tfCon = 0
+    empty.tfDevices = {}
+    empty.tfMap = {}
+    return empty
 
 
 @pytest.fixture
@@ -53,6 +40,7 @@ def returner(*args):
     return args
 
 
+# Mock Classes for Tinkerforge Modules
 class Mock_IPConnection:
     ENUMERATION_TYPE_DISCONNECTED = 3
 
@@ -78,8 +66,9 @@ class Mock_BrickletAnalogOutV3:
         self.voltage = voltage
 
 
-def test_setupTinkerforge_False(empty):
-    tf = False
+# General and tinkerforge tests.
+def test_setupTinkerforge_False(empty, monkeypatch):
+    monkeypatch.setattr(ioDefinition, 'tf', False)
     ioDefinition.InputOutput.setupTinkerforge(empty)
     with pytest.raises(AttributeError):
         empty.tfDevices
@@ -126,14 +115,12 @@ def test_deviceDisconnected(skeleton, monkeypatch):
     assert skeleton.tfMap == {}
 
 def test_getSensors_Clean(empty):
-    empty.getArduino = lambda: {}
     assert ioDefinition.InputOutput.getSensors(empty) == {}
 
 
 def test_getSensors_TF(skeleton, monkeypatch):
     skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
     skeleton.tfMap['airQuality'] = 'abc'
-    skeleton.getArduino = lambda: {}
     assert ioDefinition.InputOutput.getSensors(skeleton) == {'airPressure': 5.0, 'airQuality': 100, 'humidity': 4.0, 'temperature': 3.0}
 
 
@@ -153,4 +140,8 @@ def test_setOutput(skeleton):
     ioDefinition.InputOutput.setOutput(skeleton, '1', 9)
     assert skeleton.tfDevices['ao3'].voltage == 9
 
+
+def test_localReadout(empty):
+    empty.readoutMethods = [lambda: {'local': 123}]
+    assert ioDefinition.InputOutput.getSensors(empty) == {'local': 123}
 
