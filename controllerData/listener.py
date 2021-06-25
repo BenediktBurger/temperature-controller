@@ -153,20 +153,33 @@ class ConnectionHandler(QtCore.QRunnable):
         """Execute a command."""
         deviceName, command = pickle.loads(content)
         if deviceName.startswith('pid'):
-            device = self.controller.pids[deviceName[3]]
+            try:
+                device = self.controller.pids[deviceName[3]]
+            except IndexError:
+                intercom.sendMessage(self.connection, 'ERR', "No pid name given.".encode('ascii'))
+                return
             if command == 'components':
                 data = pickle.dumps({f"{deviceName}/components": device.components})
                 intercom.sendMessage(self.connection, 'SET', data)
             elif command == 'reset':
-                device.reset
+                device.reset()
                 intercom.sendMessage(self.connection, 'ACK')
         if deviceName == "sensors":
             self.signals.sensorCommand.emit(command)
             intercom.sendMessage(self.connection, 'ACK')
         if deviceName.startswith('out'):
-            name = deviceName[3]
-            self.signals.setOutput.emit(name, float(command))
-            intercom.sendMessage(self.connection, 'ACK')
+            try:
+                name = deviceName[3]
+            except IndexError:
+                intercom.sendMessage(self.connection, 'ERR', "No output name given.".encode('ascii'))
+                return
+            try:
+                value = float(command)
+            except ValueError:
+                intercom.sendMessage(self.connection, 'ERR', "Value is not a number.".encode('ascii'))
+            else:
+                self.signals.setOutput.emit(name, value)
+                intercom.sendMessage(self.connection, 'ACK')
 
     def stopController(self, content):
         """Stop the controller."""
