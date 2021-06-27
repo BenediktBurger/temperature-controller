@@ -110,7 +110,6 @@ class TemperatureController(QtCore.QObject):
             self.listener.stop = True
         except AttributeError:
             pass
-        print("Listener told to stop")
         self.stopSignal.emit()
         self.listenerThread.wait(10000)  # timeout in ms
 
@@ -133,9 +132,13 @@ class TemperatureController(QtCore.QObject):
         """(Re)Establish a connection to the database for storing sensor data."""
         try:
             self.database.close()
+            del self.database
         except AttributeError:
             pass  # no database present
-        self.database = psycopg2.connect(**connectionData.database)
+        try:
+            self.database = psycopg2.connect(**connectionData.database)
+        except Exception as exc:
+            self.errors['database'] = f"Database connection error {type(exc).__name__}: {exc}."
 
     # CONFIG
 
@@ -147,10 +150,7 @@ class TemperatureController(QtCore.QObject):
     @pyqtSlot(str)
     def sendSensorCommand(self, command):
         """Send a command to the sensors."""
-        try:
-            self.inputOutput.executeCommand(command)
-        except AttributeError:
-            print("Sensor cannot be configured.")
+        self.inputOutput.executeCommand(command)
 
     # OPERATION
 
@@ -163,29 +163,33 @@ class TemperatureController(QtCore.QObject):
             try:
                 output[key] = self.pids[key](data[self.pidSensor[key]])
             except KeyError:
-                print(f"Pid {key} does not have a valid sensor name.")
+                self.errors[f'pid{key}Sensor'] = True
             else:
                 if self.pidState[key] == 2:
                     self.setOutput(key, output[key])
-        try:  # TODO during testing only + output
-            data['output'] = output['0']
-        except KeyError:
-            pass  # no output calculated
+        for key in output.keys():
+            data[f'output{key}'] = output[key]
         self.writeDatabase(data)
 
     @pyqtSlot(str, float)
     def setOutput(self, name, value):
         """Set the output with `name` to `value` if the state allows it."""
-        if self.pidState[name]:
-            self.inputOutput.setOutput(name, value)
+        try:
+            if self.pidState[name]:
+                self.inputOutput.setOutput(name, value)
+        except KeyError:
+            self.errors['outputName'] = f"Output '{name}' is unknown."
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
         # TODO add error handling and backup storage.
+        try:
+            database = self.database
+        except AttributeError:
+            return  # No database connection existing.
         table = self.settings.value('database/table', defaultValue="", type=str)
         if table == "":
-            print("No database table configured.")
-            self.errors['database'] = "Table not configured."
+            self.errors['databaseTable'] = True
             return
         columns = "timestamp"
         for key in data.keys():
@@ -196,7 +200,7 @@ class TemperatureController(QtCore.QObject):
                 cursor.execute(f"INSERT INTO {table} ({columns}) VALUES (%s{', %s' * length})",
                                (datetime.datetime.now(), *data.values()))
             except Exception as exc:
-                print(f"Database error {type(exc).__name__}: {exc}.")
+                self.errors['databaseWrite'] = f"Database error {type(exc).__name__}: {exc}."
                 self.database.rollback()
             else:
                 self.database.commit()
