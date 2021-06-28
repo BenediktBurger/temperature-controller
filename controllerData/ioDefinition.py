@@ -38,8 +38,9 @@ class InputOutput:
     """Definition of input for sensors and output for controlling."""
 
     # Setup and closure.
-    def __init__(self):
+    def __init__(self, controller=None):
         """Initialize the input/output"""
+        self.controller = controller
         self.setupTinkerforge()
         self.readoutMethods = []  # List of local readout methods.
         # Local setup.
@@ -141,7 +142,7 @@ class InputOutput:
             try:
                 self.tfDevices[self.tfMap['analogOut1']].set_output_voltage(value)
             except (AttributeError, KeyError):
-                print("analogOut1 is not connected.")
+                self.controller.errors['analogOut1'] = "not connected"
 
     # LOCAL DEFINITIONS
 
