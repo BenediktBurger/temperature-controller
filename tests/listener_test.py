@@ -51,8 +51,8 @@ def signals():
 
 
 @pytest.fixture
-def ch(connection, signals):
-    return listener.ConnectionHandler(connection, signals)
+def ch(connection, signals, empty):
+    return listener.ConnectionHandler(connection, signals, empty)
 
 
 @pytest.fixture
@@ -106,15 +106,49 @@ class Test_handler():
         ch.run()
         assert message[1:] == answer
 
+    def test_run_no_content(self, ch):
+        global typ, content
+        typ, content = 'SET', b''
+        ch.run()
+        assert message[2] == "No message content".encode('ascii')
+
+    def test_run_wrong_content(self, ch):
+        global typ, content
+        typ, content = 'SET', 5
+        ch.run()
+        assert message[1] == "ERR"
+
+    def test_run_insufficient_content(self, ch):
+        global typ, content
+        typ, content = 'CMD', pickle.dumps("test")
+        ch.run()
+        assert message[1] == 'ERR'
+
     def test_setValue_wrong_input(self, ch):
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError) as excinfo:
             ch.setValue(pickle.dumps([]))
+        assert excinfo
 
     def test_getValue(self, ch):
         ch.getValue(pickle.dumps(["pid0"]))
         content = pickle.loads(message[2])
         assert message[1] == "SET"
         assert content == {"pid0": None}
+
+    def test_getValue_wrong(self, ch):
+        with pytest.raises(AssertionError):
+            ch.getValue(pickle.dumps(5))
+
+    def test_getValue_errors(self, ch):
+        ch.controller.errors = {'test': "value"}
+        ch.getValue(pickle.dumps(['errors']))
+        content = pickle.loads(message[2])
+        assert content == {'errors': {'test': "value"}}
+
+    def test_delValue(self, ch):
+        ch.controller.errors = {'test': "value"}
+        ch.delValue(pickle.dumps(['errors']))
+        assert ch.controller.errors == {}
 
     def test_executeCommand_pid_components(self, chP):
         content = pickle.dumps(['pid0', "components"])

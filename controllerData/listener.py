@@ -3,9 +3,9 @@ Intercom listener and handler for temperature controller
 
 classes
 -------
-Listener
+Listener : host, port, threadpool, controller
     A QObject listening on incoming intercom.
-Handler
+Handler : connection, signals, controller
     QRunnables handling intercom requests.
 
 Created on Mon Jun 14 14:05:04 2021 by Benedikt Moneke
@@ -30,7 +30,20 @@ class Listener(QtCore.QObject):
     """Listening on incoming intercom for new connections."""
 
     def __init__(self, host=None, port=-1, threadpool=None, controller=None):
-        """Initialize the Thread."""
+        """
+        Initialize the Thread.
+        
+        Parameters
+        ----------
+        host : str
+            Address to listen at. If 'None', try to determine it.
+        port : int
+            Port to listen at.
+        threadpool : QThreadpool
+            Pool for threads for the ConnectionHandlers, if not provided, create one.
+        controller
+            Instance of the temperature controller.
+        """
         super().__init__()
         self.signals = ListenerSignals()
         self.controller = controller
@@ -87,7 +100,7 @@ class ListenerSignals(QtCore.QObject):
 class ConnectionHandler(QtCore.QRunnable):
     """Handling the connection and its requests."""
 
-    def __init__(self, connection, signals, controller=None):
+    def __init__(self, connection, signals, controller):
         """Initialize the handler."""
         super().__init__()
         self.connection = connection
@@ -111,12 +124,17 @@ class ConnectionHandler(QtCore.QRunnable):
         reaction = {'OFF': self.stopController,
                     'SET': self.setValue,
                     'GET': self.getValue,
+                    'DEL': self.delValue,
                     'CMD': self.executeCommand,
                     }
         try:
             reaction[typ](content)
         except KeyError:
             intercom.sendMessage(self.connection, 'ERR', "Unknown command".encode('ascii'))
+        except (TypeError, AssertionError, ValueError) as exc:
+            intercom.sendMessage(self.connection, 'ERR', f"Wrong input content: {exc}".encode('ascii'))
+        except EOFError as exc:
+            intercom.sendMessage(self.connection, 'ERR', "No message content".encode('ascii'))
         finally:
             self.connection.close()
 
@@ -139,15 +157,23 @@ class ConnectionHandler(QtCore.QRunnable):
     def getValue(self, content):
         """Get some value."""
         keys = pickle.loads(content)
+        assert hasattr(keys, '__iter__'), "The content has to be an iterable."
         settings = QtCore.QSettings()
         data = {}
         for key in keys:
-            data[key] = settings.value(key)
-            """if key == 'pid0components':
-                data[key] = self.controller.pids['0'].components
-            if key == 'pid1components':
-                data[key] = self.controller.pids['1'].components"""
+            if key == 'errors':
+                data[key] = self.controller.errors
+            else:
+                data[key] = settings.value(key)
         intercom.sendMessage(self.connection, 'SET', pickle.dumps(data))
+
+    def delValue(self, content):
+        """Delete some value."""
+        keys = pickle.loads(content)
+        assert hasattr(keys, '__iter__'), "The content has to be an iterable."
+        if 'errors' in keys:
+            self.controller.errors = {}
+        intercom.sendMessage(self.connection, 'ACK')
 
     def executeCommand(self, content):
         """Execute a command."""
@@ -164,10 +190,10 @@ class ConnectionHandler(QtCore.QRunnable):
             elif command == 'reset':
                 device.reset()
                 intercom.sendMessage(self.connection, 'ACK')
-        if deviceName == "sensors":
+        elif deviceName == "sensors":
             self.signals.sensorCommand.emit(command)
             intercom.sendMessage(self.connection, 'ACK')
-        if deviceName.startswith('out'):
+        elif deviceName.startswith('out'):
             try:
                 name = deviceName[3]
             except IndexError:
