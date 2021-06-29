@@ -76,6 +76,9 @@ class ControlPanel(QtWidgets.QMainWindow):
         #   PID components
         self.pbComponents.clicked.connect(self.getComponents)
         self.pbReset.clicked.connect(self.resetPID)
+        #   Errors
+        self.pbErrorsGet.clicked.connect(self.getErrors)
+        self.pbErrorsClear.clicked.connect(self.clearErrors)
 
         # Connect to the controller
         self.connect()
@@ -116,13 +119,21 @@ class ControlPanel(QtWidgets.QMainWindow):
             message.setDetailedText(f"{type(exc).__name__}: {exc}")
         message.exec()
 
+    def sendObject(self, typ, data):
+        """Send an object and handle the errors."""
+        responseTyp, content = self.com.sendObject(typ, data)
+        if responseTyp == 'ERR':
+            raise ConnectionError(content.decode('ascii'))
+        else:
+            return responseTyp, content
+
     # General settings
     @pyqtSlot()
     def getGeneral(self):
         """Get the general settings."""
         keys = ['database/table', 'readoutInterval']
         try:
-            typ, data = self.com.sendObject('GET', keys)
+            typ, data = self.sendObject('GET', keys)
         except Exception as exc:
             self.showError(exc)
         else:
@@ -134,7 +145,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Set the changed general settings."""
         if self.changedGeneral != {}:
             try:
-                self.com.sendObject('SET', self.changedGeneral)
+                self.sendObject('SET', self.changedGeneral)
             except Exception as exc:
                 self.showError(exc)
             else:
@@ -155,7 +166,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def setOutput0(self):
         """Set the output to the value of the corresponding spinbox."""
         try:
-            self.com.sendObject('CMD', ["out0", self.sbOut0.value()])
+            self.sendObject('CMD', ["out0", self.sbOut0.value()])
         except Exception as exc:
             self.showError(exc)
 
@@ -163,7 +174,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def setOutput1(self):
         """Set the output to the value of the corresponding spinbox."""
         try:
-            self.com.sendObject('CMD', ["out1", self.sbOut1.value()])
+            self.sendObject('CMD', ["out1", self.sbOut1.value()])
         except Exception as exc:
             self.showError(exc)
 
@@ -196,7 +207,7 @@ class ControlPanel(QtWidgets.QMainWindow):
                 f"{name}/lowerLimit", f"{name}/upperLimit", f"{name}/sensor",
                 f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state"]
         try:
-            typ, data = self.com.sendObject('GET', keys)
+            typ, data = self.sendObject('GET', keys)
         except Exception as exc:
             self.showError(exc)
         else:
@@ -225,7 +236,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Set the changed values."""
         if self.changedPID != {}:
             try:
-                self.com.sendObject('SET', self.changedPID)
+                self.sendObject('SET', self.changedPID)
             except Exception as exc:
                 self.showError(exc)
             else:
@@ -310,7 +321,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Show the pid components."""
         key = f"pid{self.bbId.currentText()}"
         try:
-            typ, data = self.com.sendObject('CMD', [key, "components"])
+            typ, data = self.sendObject('CMD', [key, "components"])
         except Exception as exc:
             self.showError(exc)
         else:
@@ -319,9 +330,28 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot()
     def resetPID(self):
         try:
-            self.com.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
+            self.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
         except Exception as exc:
             self.showError(exc)
+
+    @pyqtSlot()
+    def getErrors(self):
+        try:
+            typ, data = self.sendObject('GET', ['errors'])
+            errors = data['errors']
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            text = ""
+            for key in errors.keys():
+                text += f"{key}:\t{errors[key]}\n"
+            if text == "":
+                text = "None"
+            self.lbErrors.setText(text)
+
+    @pyqtSlot()
+    def clearErrors(self):
+        pass
 
 
 if __name__ == '__main__':  # if this is the started script file
