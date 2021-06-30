@@ -11,6 +11,7 @@ import pytest
 
 # for fixtures
 from PyQt5 import QtCore
+import psycopg2
 
 from controllerData import connectionData, listener
 
@@ -91,6 +92,8 @@ class Cursor:
         _, *values = data
         if "fail" == values[0]:
             raise TypeError
+        elif "raise" == values[0]:
+            raise psycopg2.InterfaceError
         else:
             self.parent.executed = [text, data]
     def __exit__(self, *args, **kwargs):
@@ -228,9 +231,21 @@ class Test_writeDatabase:
     def writeDatabase(self):
         return TemperatureController.TemperatureController.writeDatabase
 
-    def test_no_database(self, writeDatabase, empty):
-        writeDatabase(empty, {})
-        # assert no error
+    @pytest.fixture
+    def mock_connect(self, controller):
+        def connectDatabase():
+            controller.errors['test'] = True
+        controller.connectDatabase = connectDatabase        
+
+    def test_no_database(self, writeDatabase, controller):
+        writeDatabase(controller, {})
+        assert controller.errors['databaseNone'] == 0
+
+    def test_no_database_reconnect(self, writeDatabase, controller, mock_connect):
+        controller.errors['databaseNone'] = 9
+        writeDatabase(controller, {})
+        assert controller.errors['test'] == True
+        assert 'databaseNone' not in controller.errors
 
     def test_no_table(self, controller, mock_settings, monkeypatch, writeDatabase):
         controller.database = 5
@@ -243,6 +258,12 @@ class Test_writeDatabase:
         writeDatabase(controller, {'0': "fail", '1': "fail"})
         assert controller.database.rollbacked == True
         assert 'databaseWrite' in controller.errors.keys()
+
+    def test_connection_error(self, controller, writeDatabase, mock_settings, database, mock_connect):
+        controller.database = database
+        controller.settings.setValue('database/table', "table")
+        writeDatabase(controller, {'0': "raise"})
+        assert controller.errors['test'] == True
 
     @pytest.fixture
     def fill_database(self, writeDatabase, controller, mock_settings, database):

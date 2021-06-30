@@ -186,6 +186,12 @@ class TemperatureController(QtCore.QObject):
         try:
             database = self.database
         except AttributeError:
+            tries = self.errors.get('databaseNone', -1) + 1
+            if tries < 10:
+                self.errors['databaseNone'] = tries
+            else:
+                self.connectDatabase()
+                del self.errors['databaseNone']
             return  # No database connection existing.
         table = self.settings.value('database/table', defaultValue="", type=str)
         if table == "":
@@ -199,6 +205,8 @@ class TemperatureController(QtCore.QObject):
             try:
                 cursor.execute(f"INSERT INTO {table} ({columns}) VALUES (%s{', %s' * length})",
                                (datetime.datetime.now(), *data.values()))
+            except (psycopg2.OperationalError, psycopg2.InterfaceError):
+                self.connectDatabase()  # Connection lost, reconnect.
             except Exception as exc:
                 self.errors['databaseWrite'] = f"Database error {type(exc).__name__}: {exc}."
                 self.database.rollback()
