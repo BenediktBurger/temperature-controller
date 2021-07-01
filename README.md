@@ -4,6 +4,8 @@ Software zur Steuerung der Klimatisierung im Labor.
 
 Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TCP sockets.
 
+Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Ordner tests enthalten sind.
+
 
 ## Installation
 
@@ -11,7 +13,7 @@ Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TC
 
 ### Der Controller selbst
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
-* Im Ordner controllerData die datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}
+* Im Ordner controllerData die datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}. Alternativ kann die Datei connectionData-sample an die eigenen Bedürfnisse angepasst und umbenannt werden.
 * Falls nötig die ioDefinition.py Datei an die lokalen Begebenheiten anpassen.
 * Nötige Python Abhängigkeiten installieren: PyQt5/PyQt6
 * Für die Sensoren: pyvisa (für serielle Kommunikation), Tinkerforge...
