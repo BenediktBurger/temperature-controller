@@ -47,7 +47,7 @@ class TemperatureController(QtCore.QObject):
         self.threadpool = QtCore.QThreadPool()
 
         # Initialize sensors
-        self.inputOutput = ioDefinition.InputOutput()
+        self.inputOutput = ioDefinition.InputOutput(controller=self)
 
         # PID controllers
         self.pids = {}
