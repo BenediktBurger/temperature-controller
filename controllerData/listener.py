@@ -206,6 +206,13 @@ class ConnectionHandler(QtCore.QRunnable):
             else:
                 self.signals.setOutput.emit(name, value)
                 intercom.sendMessage(self.connection, 'ACK')
+        elif deviceName == 'tinkerforge' and command == 'enumerate':
+            try:
+                self.controller.inputOutput.tfCon.enumerate()
+            except AttributeError:
+                intercom.sendMessage(self.connection, 'ERR', "No tinkerforge connection.".encode('ascii'))
+            else:
+                intercom.sendMessage(self.connection, 'ACK')
 
     def stopController(self, content):
         """Stop the controller."""

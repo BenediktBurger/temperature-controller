@@ -61,6 +61,14 @@ def chP(ch):
     ch.controller.pids['0'] = Mock_PID()
     return ch
 
+@pytest.fixture
+def chPP(chP, empty):
+    def passing():
+        pass
+    chP.controller.inputOutput = empty
+    chP.controller.inputOutput.tfCon = empty
+    chP.controller.inputOutput.tfCon.enumerate = passing
+    return chP
 
 class Test_listener():
     """Test the listener."""
@@ -184,6 +192,17 @@ class Test_handler():
             ch.executeCommand(content)
         assert message[1] == 'ACK'
         assert blocker.args == ["testing"]
+
+    def test_executeCommand_tinkerforge_enumerate(self, chPP):
+        content = pickle.dumps(['tinkerforge', "enumerate"])
+        chPP.executeCommand(content)
+        assert message[1] == 'ACK'
+
+    def test_executeCommand_tinkerforge_enumerate_fail(self, chP):
+        content = pickle.dumps(['tinkerforge', "enumerate"])
+        chP.executeCommand(content)
+        assert message[1] == 'ERR'
+        
 
     def test_stopController(self, ch, qtbot):
         with qtbot.waitSignal(ch.signals.stopController):
