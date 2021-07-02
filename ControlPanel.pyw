@@ -351,7 +351,12 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def clearErrors(self):
-        pass
+        try:
+            typ, data = self.sendObject('DEL', ['errors'])
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            self.getErrors()
 
 
 if __name__ == '__main__':  # if this is the started script file
