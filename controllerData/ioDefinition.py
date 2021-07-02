@@ -66,7 +66,7 @@ class InputOutput:
     def deviceConnected(self, uid, connected_uid, position, hardware_version, firmware_version, device_identifier, enumeration_type):
         """Store a connected thinkerforge device in the database."""
         if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:  # AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
-            print(f"Device connected: {uid} at {position} of type {device_identifier}.")
+            print(f"Device {'connected' if enumeration_type else 'available'}: {uid} at {position} of type {device_identifier}.")
             self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
             if device_identifier == BrickHAT.DEVICE_IDENTIFIER:
                 self.tfMap['HAT'] = uid
@@ -77,7 +77,8 @@ class InputOutput:
                     self.tfMap['analogOut1'] = uid
             elif device_identifier == BrickletAirQuality.DEVICE_IDENTIFIER:
                 self.tfMap['airQuality'] = uid
-        else:  # Only uid and enumeration_type have valid values.
+        else:
+            # Only uid and enumeration_type have valid values.
             print(f"Device {uid} disconnected.")
             try:
                 del self.tfDevices[uid]
@@ -90,7 +91,7 @@ class InputOutput:
     def close(self):
         """Close the connection."""
         try:
-            self.tfcon.disconnect()
+            self.tfCon.disconnect()
         except AttributeError:
             pass  # Not existent
         # Closure of local devices.
@@ -110,6 +111,10 @@ class InputOutput:
         data = {}
         try:
             iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
+        except tfError as exc:
+            if exc.value == tfError.TIMEOUT:
+                del self.tfDevices[self.tfMap['airQuality']]
+                del self.tfMap['airQuality']
         except (AttributeError, KeyError):
             pass
         else:
@@ -135,14 +140,13 @@ class InputOutput:
             self.setSetpoint(value)
         elif name == '1':
             try:
-                assert value < 12000, "Maximum voltage 12 V."
-            except AssertionError as exc:
-                print(exc)
-                return
-            try:
                 self.tfDevices[self.tfMap['analogOut1']].set_output_voltage(value)
             except (AttributeError, KeyError):
-                self.controller.errors['analogOut1'] = "not connected"
+                self.controller.errors['analogOut1'] = "Not connected."
+            except tfError as exc:
+                if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
+                    del self.tfDevices[self.tfMap['analogOut1']]
+                    del self.tfMap['analogOut1']
 
     # LOCAL DEFINITIONS
 
