@@ -13,7 +13,8 @@ Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Or
 
 ### Der Controller selbst
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
-* Im Ordner controllerData die datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}. Alternativ kann die Datei connectionData-sample an die eigenen Bedürfnisse angepasst und umbenannt werden.
+* Im Ordner controllerData die Datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: database = {'host': "hostname",...}. Alternativ kann die Datei connectionData-sample an die eigenen Bedürfnisse angepasst und umbenannt werden.
+* Im Ordner controllerData die Datei *sensors-sample.py* in *sensors.py* umbenennen und an lokale Bedingungen anpassen: Unter welchem Namen welche Sensoren ausgelesen werden sollen.
 * Falls nötig die ioDefinition.py Datei an die lokalen Begebenheiten anpassen.
 * Nötige Python Abhängigkeiten installieren: PyQt5/PyQt6
 * Für die Sensoren: pyvisa (für serielle Kommunikation), Tinkerforge...

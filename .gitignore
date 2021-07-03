@@ -15,3 +15,4 @@ cmd.lnk
 desktop.ini
 
 controllerData/connectionData.py
+controllerData/sensors.py

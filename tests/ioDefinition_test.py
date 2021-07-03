@@ -107,6 +107,13 @@ def skeletonP(skeleton, controller):
     skeleton.controller = controller
     return skeleton
 
+@pytest.fixture
+def calling():
+    def callingf(*args):
+        global called
+        called = True
+    return callingf
+
 # General and tinkerforge tests.
 def test_setupTinkerforge_False(empty, monkeypatch):
     monkeypatch.setattr(ioDefinition, 'tf', False)
@@ -161,38 +168,35 @@ class Test_deviceDisconnected:
 
 
 class Test_close:
-    @pytest.fixture
-    def clean(empty, connection):
-        empty.rm = connection
-        return empty
+    def test_close_tf(self, empty):
+        empty.tfCon = Mock_IPConnection()
+        ioDefinition.InputOutput.close(empty)
+        assert empty.tfCon.disconnected == True
 
-    def test_close_clean(self, clean):
-        ioDefinition.InputOutput.close(clean)
-        assert clean.rm.open == False
+    def test_close_sensors(self, empty, monkeypatch, calling):
+        monkeypatch.setattr('controllerData.sensors.close', calling)
+        ioDefinition.InputOutput.close(empty)
+        assert called == True
 
-    def test_close_tf(self, clean):
-        clean.tfCon = Mock_IPConnection()
-        ioDefinition.InputOutput.close(clean)
-        assert clean.tfCon.disconnected == True
+class Test_getSensors:
+    def test_getSensors_Clean(self, empty):
+        assert ioDefinition.InputOutput.getSensors(empty) == {}
 
+    def test_getSensors_TF(self, skeleton):
+        skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
+        skeleton.tfMap['airQuality'] = 'abc'
+        assert ioDefinition.InputOutput.getSensors(skeleton) == {'airPressure': 5.0, 'airQuality': 100, 'humidity': 4.0, 'temperature': 3.0}
 
+    def test_getSensors_TF_connection_lost(self, skeleton, timeout):
+        skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
+        skeleton.tfDevices['abc'].get_all_values = timeout
+        skeleton.tfMap['airQuality'] = 'abc'
+        ioDefinition.InputOutput.getSensors(skeleton)
+        assert 'abc' not in skeleton.tfDevices.keys()
 
-def test_getSensors_Clean(empty):
-    assert ioDefinition.InputOutput.getSensors(empty) == {}
-
-
-def test_getSensors_TF(skeleton):
-    skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
-    skeleton.tfMap['airQuality'] = 'abc'
-    assert ioDefinition.InputOutput.getSensors(skeleton) == {'airPressure': 5.0, 'airQuality': 100, 'humidity': 4.0, 'temperature': 3.0}
-
-
-def test_getSensors_TF_connection_lost(skeleton, timeout):
-    skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
-    skeleton.tfDevices['abc'].get_all_values = timeout
-    skeleton.tfMap['airQuality'] = 'abc'
-    ioDefinition.InputOutput.getSensors(skeleton)
-    assert 'abc' not in skeleton.tfDevices.keys()
+    def test_call_sensors(self, empty, monkeypatch):
+        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {'test': True})
+        assert ioDefinition.InputOutput.getSensors(empty) == {'test': True}
 
 def test_setOutput_Not_Connected(skeletonP, capsys):
     ioDefinition.InputOutput.setOutput(skeletonP, '1', 100)
@@ -209,9 +213,4 @@ def test_setOutput(skeleton):
     skeleton.tfMap['analogOut1'] = 'ao3'
     ioDefinition.InputOutput.setOutput(skeleton, '1', 9)
     assert skeleton.tfDevices['ao3'].voltage == 9
-
-
-def test_localReadout(empty):
-    empty.readoutMethods = [lambda: {'local': 123}]
-    assert ioDefinition.InputOutput.getSensors(empty) == {'local': 123}
 
