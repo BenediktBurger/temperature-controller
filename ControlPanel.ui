@@ -6,16 +6,16 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>243</width>
-    <height>767</height>
+    <width>453</width>
+    <height>452</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Temperature Controller Control Panel</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0">
-    <item>
+   <layout class="QGridLayout" name="gridLayout_3">
+    <item row="0" column="0">
      <widget class="QGroupBox" name="gbGeneral">
       <property name="title">
        <string>General settings</string>
@@ -81,13 +81,60 @@
          </property>
         </widget>
        </item>
+       <item row="3" column="0" colspan="2">
+        <widget class="QPushButton" name="pbShutDown">
+         <property name="palette">
+          <palette>
+           <active>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>255</red>
+               <green>0</green>
+               <blue>0</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </active>
+           <inactive>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>255</red>
+               <green>0</green>
+               <blue>0</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </inactive>
+           <disabled>
+            <colorrole role="ButtonText">
+             <brush brushstyle="SolidPattern">
+              <color alpha="255">
+               <red>120</red>
+               <green>120</green>
+               <blue>120</blue>
+              </color>
+             </brush>
+            </colorrole>
+           </disabled>
+          </palette>
+         </property>
+         <property name="toolTip">
+          <string>Shut down the temperature controller</string>
+         </property>
+         <property name="text">
+          <string>Shut down controller</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
-    <item>
+    <item row="1" column="0">
      <widget class="QGroupBox" name="groupBox">
       <property name="title">
-       <string>Direct control</string>
+       <string>Direct output control</string>
       </property>
       <layout class="QGridLayout" name="gridLayout" columnstretch="0,1,0">
        <item row="0" column="0">
@@ -153,57 +200,49 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="0" colspan="3">
-        <widget class="QPushButton" name="pbShutDown">
-         <property name="palette">
-          <palette>
-           <active>
-            <colorrole role="ButtonText">
-             <brush brushstyle="SolidPattern">
-              <color alpha="255">
-               <red>255</red>
-               <green>0</green>
-               <blue>0</blue>
-              </color>
-             </brush>
-            </colorrole>
-           </active>
-           <inactive>
-            <colorrole role="ButtonText">
-             <brush brushstyle="SolidPattern">
-              <color alpha="255">
-               <red>255</red>
-               <green>0</green>
-               <blue>0</blue>
-              </color>
-             </brush>
-            </colorrole>
-           </inactive>
-           <disabled>
-            <colorrole role="ButtonText">
-             <brush brushstyle="SolidPattern">
-              <color alpha="255">
-               <red>120</red>
-               <green>120</green>
-               <blue>120</blue>
-              </color>
-             </brush>
-            </colorrole>
-           </disabled>
-          </palette>
-         </property>
+      </layout>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QGroupBox" name="gbErrors">
+      <property name="title">
+       <string>Errors</string>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pbErrorsGet">
          <property name="toolTip">
-          <string>Shut down the temperature controller</string>
+          <string>Read the current errors.</string>
          </property>
          <property name="text">
-          <string>Shut down controller</string>
+          <string>Get</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="pbErrorsClear">
+         <property name="toolTip">
+          <string>Clear the errors and read them afterwards.</string>
+         </property>
+         <property name="text">
+          <string>Clear</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QLabel" name="lbErrors">
+         <property name="toolTip">
+          <string>Errors.</string>
+         </property>
+         <property name="text">
+          <string>None</string>
          </property>
         </widget>
        </item>
       </layout>
      </widget>
     </item>
-    <item>
+    <item row="0" column="1" rowspan="3">
      <widget class="QGroupBox" name="gbPID">
       <property name="toolTip">
        <string>Id of the PID controller.</string>
@@ -617,36 +656,6 @@
       </layout>
      </widget>
     </item>
-    <item>
-     <widget class="QGroupBox" name="gbErrors">
-      <property name="title">
-       <string>Errors</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
-        <widget class="QPushButton" name="pbErrorsGet">
-         <property name="text">
-          <string>Get</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QPushButton" name="pbErrorsClear">
-         <property name="text">
-          <string>Clear</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QLabel" name="lbErrors">
-         <property name="text">
-          <string>None</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -654,7 +663,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>243</width>
+     <width>453</width>
      <height>21</height>
     </rect>
    </property>
@@ -691,7 +700,6 @@
   <tabstop>pbOut0</tabstop>
   <tabstop>sbOut1</tabstop>
   <tabstop>pbOut1</tabstop>
-  <tabstop>pbShutDown</tabstop>
   <tabstop>bbId</tabstop>
   <tabstop>leSensor</tabstop>
   <tabstop>sbSetpoint</tabstop>
