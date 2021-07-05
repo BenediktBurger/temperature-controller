@@ -5,6 +5,7 @@ Configuration of the local sensors.
 
 import numpy as np
 import pyvisa
+from tinkerforge.ip_connection import Error as tfError
 
 
 # Main methods setup, getData, close.
@@ -19,6 +20,14 @@ def getData(self):
     """Read the sensors and return a dictionary."""
     data = getArduinoData(self.south)
     data.update(getWDEData(self.wde))
+    # Example for a tinkerforge temperature sensor with 'uid', together with error handling
+    try:
+        data['abc'] = self.tfDevices['uid'].get_temperature() / 100
+    except tfError as exc:
+        if exc.value == tfError.TIMEOUT:
+            del self.tfDevices['uid']
+    except KeyError:
+        pass  # device is not connected
     return data
     # Tinkerforge:
     # temperatureV2.get_temperature() / 100  # in °C
