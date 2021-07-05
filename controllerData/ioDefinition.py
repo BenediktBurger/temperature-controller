@@ -120,21 +120,16 @@ class InputOutput:
         return data
 
     def setOutput(self, name, value):
-        """Set the output with `name` to `value`."""
-        if name == '0':
-            try:
-                sensors.setSetpoint(self, value)
-            except AttributeError:
-                self.controller.errors['analogOut0'] = "Not connected."
-        elif name == '1':
-            try:
-                self.tfDevices[self.tfMap['analogOut1']].set_output_voltage(value)
-            except (AttributeError, KeyError):
-                self.controller.errors['analogOut1'] = "Not connected."
-            except tfError as exc:
-                if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
-                    del self.tfDevices[self.tfMap['analogOut1']]
-                    del self.tfMap['analogOut1']
+        """Set the output with `name` to `value` in V."""
+        key = f'analogOut{name}'
+        try:
+            self.tfDevices[self.tfMap[key]].set_output_voltage(value * 1000)
+        except (AttributeError, KeyError):
+            self.controller.errors[key] = "Not connected."
+        except tfError as exc:
+            if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
+                del self.tfDevices[self.tfMap[key]]
+                del self.tfMap[key]
 
     def executeCommand(self, command):
         """Send `command` to sensors."""
@@ -142,4 +137,3 @@ class InputOutput:
             sensors.executeCommand(self, command)
         except AttributeError:
             pass
-
