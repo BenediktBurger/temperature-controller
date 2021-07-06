@@ -26,6 +26,7 @@ class Mock_Controller:
 
 class Mock_PID:
     components = 123
+
     def __init__(self):
         self.resetted = False
 
@@ -41,8 +42,8 @@ def disable_network(monkeypatch, connection):
 
     def new_readMessage(connection=connection):
         return typ, content
-    monkeypatch.setattr(intercom, "sendMessage", lambda *args, **kwargs: new_sendMessage(*args, **kwargs))
-    monkeypatch.setattr(intercom, "readMessage", lambda connection: new_readMessage(connection))
+    monkeypatch.setattr(intercom, "sendMessage", new_sendMessage)
+    monkeypatch.setattr(intercom, "readMessage", new_readMessage)
 
 
 @pytest.fixture
@@ -60,6 +61,7 @@ def chP(ch):
     ch.controller = Mock_Controller()
     ch.controller.pids['0'] = Mock_PID()
     return ch
+
 
 @pytest.fixture
 def chPP(chP, empty):
@@ -113,12 +115,13 @@ class Test_handler_run():
     def test_Exception(self, ch, raise_Exception):
         ch.controller.errors = {}
         ch.run()
-        assert 'intercom' in ch.controller.erros.keys()
+        assert 'intercom' in ch.controller.errors.keys()
         assert not ch.connection.open
 
     @pytest.mark.parametrize('typIn, contentIn, answer', [('ACK', None, ['ERR', "Unknown command".encode('ascii')]),
                                                           ('OFF', None, ['ACK']),
                                                           ('GET', pickle.dumps(['pid0']), ['SET', pickle.dumps({"pid0": None})]),
+                                                          ('DEL', pickle.dumps([]), ['ACK'])
                                                           ])
     def test_run(self, ch, typIn, contentIn, answer):
         global typ, content
@@ -154,6 +157,10 @@ class Test_handler_general():
             ch.setValue(pickle.dumps([]))
         assert excinfo
 
+    def test_setValue_empty_dictionary(self, ch):
+        ch.setValue(pickle.dumps({}))
+        assert message[1] == "ACK"
+
     def test_getValue(self, ch):
         ch.getValue(pickle.dumps(["pid0"]))
         content = pickle.loads(message[2])
@@ -178,12 +185,12 @@ class Test_handler_general():
     def test_executeCommand_pid_components(self, chP):
         content = pickle.dumps(['pid0', "components"])
         chP.executeCommand(content)
-        assert message[1:] == ['SET', pickle.dumps({f"pid0/components": 123})]
+        assert message[1:] == ['SET', pickle.dumps({"pid0/components": 123})]
 
     def test_executeCommand_pid_reset(self, chP):
         content = pickle.dumps(['pid0', "reset"])
         chP.executeCommand(content)
-        assert chP.controller.pids['0'].resetted == True
+        assert chP.controller.pids['0'].resetted
 
     @pytest.mark.parametrize('out, value', [('0', 15.3), ('1', "10"), ('3', "17.3")])
     def test_executeCommand_output(self, ch, qtbot, out, value):
@@ -198,7 +205,7 @@ class Test_handler_general():
         ch.executeCommand(content)
         assert message[1:] == ['ERR', "No output name given.".encode('ascii')]
 
-    def test_executeCommand_output_wrong_value(self,ch):
+    def test_executeCommand_output_wrong_value(self, ch):
         content = pickle.dumps(['out1', 'f'])
         ch.executeCommand(content)
         assert message[1:] == ['ERR', "Value is not a number.".encode('ascii')]
@@ -219,7 +226,6 @@ class Test_handler_general():
         content = pickle.dumps(['tinkerforge', "enumerate"])
         chP.executeCommand(content)
         assert message[1] == 'ERR'
-        
 
     def test_stopController(self, ch, qtbot):
         with qtbot.waitSignal(ch.signals.stopController):
