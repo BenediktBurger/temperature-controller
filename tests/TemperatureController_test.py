@@ -71,7 +71,7 @@ class Mock_Listener:
         pass
 
 class Mock_InputOutput:
-    def __init__(self):
+    def __init__(self, controller=None):
         self.test_output = {}
     def close(self):
         pass
@@ -153,7 +153,7 @@ class Test_Controller_init:
         contr.stop()
 
     def test_init(self, controller):
-        assert controller.errors == {}
+        assert controller.errors == {'pid0Sensor': True, 'pid1Sensor': True}
 
 class Test_connectDatabase:
     def test_connectDatabase_close_existent(self, empty, replace_database, connection):
@@ -175,6 +175,18 @@ class Test_connectDatabase:
         assert not hasattr(controller, 'database')
 
 
+class Test_setupPID:
+    @pytest.fixture(autouse=True)
+    def pid(self, controller, empty):
+        def set_auto_mode(*args):
+            pass
+        controller.pids['0'] = empty
+        controller.pids['0'].set_auto_mode = set_auto_mode
+
+    def test_setupPID(self, controller):
+        TemperatureController.TemperatureController.setupPID(controller, '0')
+        assert controller.errors['pid0Sensor']
+
 def test_sendSensorCommand(controller, mock_io):
     TemperatureController.TemperatureController.sendSensorCommand(controller, 'valid')
     # assert no error
@@ -192,25 +204,31 @@ class Test_readoutTimeout:
 
     @pytest.fixture
     def pid_sensor(self, controller, pid):
-        controller.pidSensor['0'] = '0'
+        controller.pidSensor['0'] = ['0', '1']
 
     def test_no_pids(self, controller):
         TemperatureController.TemperatureController.readTimeout(controller)
         assert controller.test_database == {'0': 0, '1': 1}
 
-    def test_pid_without_sensor(self, controller, pid):
-        TemperatureController.TemperatureController.readTimeout(controller)
-        assert controller.errors['pid0Sensor'] == True
-
     def test_pid_no_output(self, controller, pid_sensor):
         TemperatureController.TemperatureController.readTimeout(controller)
-        assert controller.test_database['output0'] == 0
+        assert controller.test_database['pidOutput0'] == 0
         assert controller.test_output == {}
 
     def test_pid_output(self, controller, pid_sensor):
         controller.pidState['0'] = 2
         TemperatureController.TemperatureController.readTimeout(controller)
         assert controller.test_output['0'] == 0
+
+    def test_pid_second_sensor(self, controller, pid):
+        controller.pidSensor['0'] = ['missing', '1']
+        TemperatureController.TemperatureController.readTimeout(controller)
+        assert controller.test_database['pidOutput0'] == 1
+
+    def test_pid_no_sensors(self, controller, pid):
+        controller.pidSensor['0'] = ['missing']
+        assert not hasattr(controller, 'test_database')
+
 
 def test_setOutput_invalid_name(controller):
     TemperatureController.TemperatureController.setOutput(controller, '3', 5)
@@ -235,7 +253,7 @@ class Test_writeDatabase:
     def mock_connect(self, controller):
         def connectDatabase():
             controller.errors['test'] = True
-        controller.connectDatabase = connectDatabase        
+        controller.connectDatabase = connectDatabase
 
     def test_no_database(self, writeDatabase, controller):
         writeDatabase(controller, {})
@@ -244,7 +262,7 @@ class Test_writeDatabase:
     def test_no_database_reconnect(self, writeDatabase, controller, mock_connect):
         controller.errors['databaseNone'] = 9
         writeDatabase(controller, {})
-        assert controller.errors['test'] == True
+        assert controller.errors['test']
         assert 'databaseNone' not in controller.errors
 
     def test_no_table(self, controller, mock_settings, monkeypatch, writeDatabase):
@@ -256,14 +274,14 @@ class Test_writeDatabase:
         controller.database = database
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': "fail", '1': "fail"})
-        assert controller.database.rollbacked == True
+        assert controller.database.rollbacked
         assert 'databaseWrite' in controller.errors.keys()
 
     def test_connection_error(self, controller, writeDatabase, mock_settings, database, mock_connect):
         controller.database = database
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': "raise"})
-        assert controller.errors['test'] == True
+        assert controller.errors['test']
 
     @pytest.fixture
     def fill_database(self, writeDatabase, controller, mock_settings, database):
@@ -272,7 +290,7 @@ class Test_writeDatabase:
         writeDatabase(controller, {'0': 0, '1': 1})
 
     def test_write_commited(self, controller, fill_database):
-        assert controller.database.committed == True
+        assert controller.database.committed
 
     def test_write_text(self, controller, fill_database):
         assert controller.database.executed[0] == "INSERT INTO table (timestamp, 0, 1) VALUES (%s, %s, %s)"
@@ -280,4 +298,3 @@ class Test_writeDatabase:
     def test_write_value(self, controller, fill_database):
         _, *value = controller.database.executed[1]
         assert value == [0, 1]
-

@@ -97,8 +97,11 @@ class TemperatureController(QtCore.QObject):
         pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
         pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
                           settings.value('lastOutput', defaultValue=None, type=float))
-        self.pidSensor[name] = settings.value('sensor', defaultValue="", type=str)
         self.pidState[name] = settings.value('state', defaultValue=0, type=int)
+        sensors = settings.value('sensor', defaultValue="", type=str).replace(' ', '').split(',')
+        if sensors == ['']:
+            self.errors[f'pid{name}Sensor'] = True
+        self.pidSensor[name] = sensors
 
     @pyqtSlot()
     def stop(self):
@@ -160,15 +163,17 @@ class TemperatureController(QtCore.QObject):
         data = self.inputOutput.getSensors()
         output = {}
         for key in self.pids.keys():
-            try:
-                output[key] = self.pids[key](data[self.pidSensor[key]])
-            except KeyError:
-                self.errors[f'pid{key}Sensor'] = True
-            else:
-                if self.pidState[key] == 2:
-                    self.setOutput(key, output[key])
+            for sensor in self.pidSensor[key]:
+                try:
+                    output[key] = self.pids[key](data[sensor])
+                except KeyError:
+                    pass
+                else:
+                    if self.pidState[key] == 2:
+                        self.setOutput(key, output[key])
+                    break  # Valid sensor found: stop loop.
         for key in output.keys():
-            data[f'output{key}'] = output[key]
+            data[f'pidOutput{key}'] = output[key]
         self.writeDatabase(data)
 
     @pyqtSlot(str, float)
@@ -182,8 +187,7 @@ class TemperatureController(QtCore.QObject):
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
-        # TODO add error handling and backup storage.
-        try:
+        try:  # Check connection to the database and reconnect if necessary.
             database = self.database
         except AttributeError:
             tries = self.errors.get('databaseNone', -1) + 1
@@ -201,7 +205,7 @@ class TemperatureController(QtCore.QObject):
         for key in data.keys():
             columns += f", {key}"
         length = len(data)
-        with self.database.cursor() as cursor:
+        with database.cursor() as cursor:
             try:
                 cursor.execute(f"INSERT INTO {table} ({columns}) VALUES (%s{', %s' * length})",
                                (datetime.datetime.now(), *data.values()))
@@ -209,9 +213,9 @@ class TemperatureController(QtCore.QObject):
                 self.connectDatabase()  # Connection lost, reconnect.
             except Exception as exc:
                 self.errors['databaseWrite'] = f"Database error {type(exc).__name__}: {exc}."
-                self.database.rollback()
+                database.rollback()
             else:
-                self.database.commit()
+                database.commit()
 
 
 if __name__ == "__main__":
