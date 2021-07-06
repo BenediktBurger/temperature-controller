@@ -10,6 +10,7 @@ Created on Mon Jun 21 13:11:23 2021 by Benedikt Moneke
 import pytest
 from tinkerforge.ip_connection import Error as tfError
 
+
 # file to test
 from controllerData import ioDefinition
 
@@ -48,8 +49,12 @@ class Mock_IPConnection:
     def disconnect(self):
         self.disconnected = True
 
+
 class Mock_BrickHAT:
     DEVICE_IDENTIFIER = 111
+
+    def set_sleep_mode(self, *args):
+        self.args = args
 
 
 class Mock_BrickletAirQuality:
@@ -69,7 +74,7 @@ class Mock_BrickletAnalogOutV3:
         if voltage < 0:
             raise tfError(tfError.TIMEOUT, "Test error.")
         else:
-            self.voltage = voltage
+            self.voltage = voltage / 1000  # mV to V
 
 
 @pytest.fixture
@@ -138,6 +143,7 @@ def test_deviceConnected_available(skeleton, mock_tinkerforge, tf_device_pars, c
     ioDefinition.InputOutput.deviceConnected(skeleton, *tf_device_pars)
     assert capsys.readouterr().out == "Device available: abc at i of type 111.\n"
 
+
 class Test_deviceDisconnected:
     @pytest.fixture(autouse=True)
     def pars_modified(self, tf_device_pars):
@@ -171,16 +177,29 @@ class Test_close:
     def test_close_tf(self, empty):
         empty.tfCon = Mock_IPConnection()
         ioDefinition.InputOutput.close(empty)
-        assert empty.tfCon.disconnected == True
+        assert empty.tfCon.disconnected
+
+    def test_stop_watchdog(self, skeleton):
+        skeleton.tfDevices['abc'] = Mock_BrickHAT()
+        skeleton.tfMap['HAT'] = 'abc'
+        ioDefinition.InputOutput.close(skeleton)
+        assert skeleton.tfDevices['abc'].args == (0, 0, False, False, False)
 
     def test_close_sensors(self, empty, monkeypatch, calling):
         monkeypatch.setattr('controllerData.sensors.close', calling)
         ioDefinition.InputOutput.close(empty)
-        assert called == True
+        assert called
+
 
 class Test_getSensors:
     def test_getSensors_Clean(self, empty):
         assert ioDefinition.InputOutput.getSensors(empty) == {}
+
+    def test_renew_watchdog(self, skeleton):
+        skeleton.tfDevices['abc'] = Mock_BrickHAT()
+        skeleton.tfMap['HAT'] = 'abc'
+        ioDefinition.InputOutput.getSensors(skeleton)
+        assert skeleton.tfDevices['abc'].args == (30, 1, True, False, True)
 
     def test_getSensors_TF(self, skeleton):
         skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
@@ -198,9 +217,10 @@ class Test_getSensors:
         monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {'test': True})
         assert ioDefinition.InputOutput.getSensors(empty) == {'test': True}
 
+
 def test_setOutput_Not_Connected(skeletonP, capsys):
     ioDefinition.InputOutput.setOutput(skeletonP, '1', 100)
-    assert skeletonP.controller.errors['analogOut1']  == "Not connected."
+    assert skeletonP.controller.errors['analogOut1'] == "Not connected."
 
 def test_setOutput_connection_lost(skeleton):
     skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
@@ -213,4 +233,3 @@ def test_setOutput(skeleton):
     skeleton.tfMap['analogOut1'] = 'ao3'
     ioDefinition.InputOutput.setOutput(skeleton, '1', 9)
     assert skeleton.tfDevices['ao3'].voltage == 9
-

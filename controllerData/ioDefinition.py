@@ -64,7 +64,8 @@ class InputOutput:
         """Store a connected thinkerforge device in the database."""
         if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:  # AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
             print(f"Device {'connected' if enumeration_type else 'available'}: {uid} at {position} of type {device_identifier}.")
-            self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
+            if uid not in self.tfDevices.keys():
+                self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
             if device_identifier == BrickHAT.DEVICE_IDENTIFIER:
                 self.tfMap['HAT'] = uid
             elif device_identifier == BrickletAnalogOutV3.DEVICE_IDENTIFIER:
@@ -88,17 +89,26 @@ class InputOutput:
     def close(self):
         """Close the connection."""
         try:
-            self.tfCon.disconnect()
-        except AttributeError:
-            pass  # Not existent
-        try:
             sensors.close(self)
         except AttributeError:
             pass  # No sensors file.
+        try:  # Deactivate Watchdog.
+            self.tfDevices[self.tfMap['HAT']].set_sleep_mode(0, 0, False, False, False)
+        except (AttributeError, KeyError):
+            print("No HAT brick found, watchdog is not deactivated.")
+        try:
+            self.tfCon.disconnect()
+        except AttributeError:
+            pass  # Not existent
 
     # Methods
     def getSensors(self):
         """Request the sensor data and return a dictionary."""
+        try:  # Renew the HAT brick watchdog.
+            self.tfDevices[self.tfMap['HAT']].set_sleep_mode(30, 1, True, False, True)
+        except (AttributeError, KeyError):
+            pass
+        # Read sensor data
         data = {}
         try:  # Read the air quality bricklet.
             iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
