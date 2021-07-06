@@ -70,6 +70,7 @@ def chPP(chP, empty):
     chP.controller.inputOutput.tfCon.enumerate = passing
     return chP
 
+
 class Test_listener():
     """Test the listener."""
 
@@ -94,14 +95,26 @@ class Test_listener():
             listener.Listener()
 
 
-class Test_handler():
-    """Test the connectionHandler."""
+class Test_handler_run():
+    """Test the connectionHandler run method."""
 
     @pytest.fixture
     def running(self):
         global typ, content
         typ = 'ACK'
         content = None
+
+    @pytest.fixture
+    def raise_Exception(self, monkeypatch):
+        def raising(*args):
+            raise Exception('test')
+        monkeypatch.setattr(intercom, 'readMessage', raising)
+
+    def test_Exception(self, ch, raise_Exception):
+        ch.controller.errors = {}
+        ch.run()
+        assert 'intercom' in ch.controller.erros.keys()
+        assert not ch.connection.open
 
     @pytest.mark.parametrize('typIn, contentIn, answer', [('ACK', None, ['ERR', "Unknown command".encode('ascii')]),
                                                           ('OFF', None, ['ACK']),
@@ -131,6 +144,10 @@ class Test_handler():
         typ, content = 'CMD', pickle.dumps("test")
         ch.run()
         assert message[1] == 'ERR'
+
+
+class Test_handler_general():
+    """Test the connectionHandler in general"""
 
     def test_setValue_wrong_input(self, ch):
         with pytest.raises(AssertionError) as excinfo:

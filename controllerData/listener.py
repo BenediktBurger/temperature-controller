@@ -77,12 +77,11 @@ class Listener(QtCore.QObject):
         """Listen for connections and emit it via signals."""
         while not self.stop:
             try:
-                connection, addr = self.listener.accept()
+                connection, address = self.listener.accept()
             except socket.timeout:
                 pass
             else:
-                # print(addr)
-                handler = ConnectionHandler(connection, self.signals, self.controller)
+                handler = ConnectionHandler(connection, self.signals, self.controller, address)
                 self.threadpool.start(handler)
         self.listener.close()
         print("Listen stopped to listen.")
@@ -100,12 +99,13 @@ class ListenerSignals(QtCore.QObject):
 class ConnectionHandler(QtCore.QRunnable):
     """Handling the connection and its requests."""
 
-    def __init__(self, connection, signals, controller):
+    def __init__(self, connection, signals, controller, address=None):
         """Initialize the handler."""
         super().__init__()
         self.connection = connection
         self.signals = signals
         self.controller = controller
+        self.address = address
 
     def run(self):
         """Handle the connection"""
@@ -119,8 +119,9 @@ class ConnectionHandler(QtCore.QRunnable):
             self.connection.close()
             return
         except Exception as exc:
-            print(f"Communication error {type(exc).__name__}: {exc}.")
+            self.controller.errors['intercom'] = f"Communication error {type(exc).__name__}: {exc}. Address {self.address}."
             self.connection.close()
+            return
         reaction = {'OFF': self.stopController,
                     'SET': self.setValue,
                     'GET': self.getValue,
@@ -133,7 +134,7 @@ class ConnectionHandler(QtCore.QRunnable):
             intercom.sendMessage(self.connection, 'ERR', "Unknown command".encode('ascii'))
         except (TypeError, AssertionError, ValueError) as exc:
             intercom.sendMessage(self.connection, 'ERR', f"Wrong input content: {exc}".encode('ascii'))
-        except EOFError as exc:
+        except EOFError:
             intercom.sendMessage(self.connection, 'ERR', "No message content".encode('ascii'))
         finally:
             self.connection.close()
