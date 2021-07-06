@@ -8,8 +8,8 @@ Created on Sat Jun 19 08:17:59 2021 by Benedikt Moneke
 
 # for tests
 import pytest
-import sys
-sys.path.append('C:/Users/moneke/temperature-controller')
+#import sys
+#sys.path.append('C:/Users/moneke/temperature-controller')
 
 
 class Empty:
