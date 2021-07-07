@@ -1,11 +1,32 @@
 #!/usr/bin/env python3
 """
-Configuration of the local sensors.
+Example configuration of the local sensors.
+
+Adjust this file according to your needs.
+If a method is not required, just use 'pass'.
+
+The following methods have to be present:
+setup : self
+    What to do at initialization.
+getData : self
+    Read the sensors and return a dictionary with the data.
+close : self
+    What to do at closure of the controller.
+
+This method can be present:
+executeCommand : self, command
+    Handle the string `command`, for example change some device settings.
+
+
+All the other methods here are examples for routines outsourced from above methods.
 """
 
+# Necessary for tinkerforge
+from tinkerforge.ip_connection import Error as tfError
+
+# Only necessary for other sensors in this example: Arduino and wde.
 import numpy as np
 import pyvisa
-from tinkerforge.ip_connection import Error as tfError
 
 
 # Main methods setup, getData, close.
@@ -18,11 +39,13 @@ def setup(self):
 
 def getData(self):
     """Read the sensors and return a dictionary."""
-    data = getArduinoData(self.south)
+    data = {}  # Empty dictionary.
+    data.update(getAirQuality(self))
+    data.update(getArduinoData(self.south))  # Combine with another dictionary.
     data.update(getWDEData(self.wde))
     # Example for a tinkerforge temperature sensor with 'uid', together with error handling
     try:
-        data['abc'] = self.tfDevices['uid'].get_temperature() / 100
+        data['abc'] = self.tfDevices['uid'].get_temperature() / 100  # Add a single value.
     except tfError as exc:
         if exc.value == tfError.TIMEOUT:
             del self.tfDevices['uid']
@@ -37,12 +60,6 @@ def getData(self):
     # airQuality.get_temperature() / 100  # in °C
     # airQuality.get_humidity() / 100  # relative air humidity in %
     # airQuality.get_air_pressure() / 100  # in hPa
-
-
-def setSetpoint(self, temperature):
-    """Set the arduino setpoint to `temperature`."""
-    setpoint = calculateSetpoint(temperature)
-    self.south.query(f"s{setpoint}")
 
 
 def executeCommand(self, command):
@@ -67,6 +84,25 @@ def close(self):
 
 
 # Auxiliary methods.
+
+# Tinkerforge
+def getAirQuality(self):
+    """Read the air quality bricklet and return the data in a dictionary."""
+    try:
+        iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
+    except tfError as exc:
+        if exc.value == tfError.TIMEOUT:
+            del self.tfDevices[self.tfMap['airQuality']]
+            del self.tfMap['airQuality']
+    except (AttributeError, KeyError):
+        return {}
+    else:
+        return {'airQuality': iaq,
+                'temperature': temp / 100,
+                'humidity': humidity / 100,
+                'airPressure': pressure / 100,
+                }
+
 
 # Methods for Arduino
 def setupArduino(resourceManager, port):
@@ -99,6 +135,12 @@ def getArduinoData(arduino):
         for key in data.keys():
             data[key] = calculateTemperature(data[key])
         return data
+
+
+def setSetpoint(self, temperature):
+    """Set the arduino setpoint to `temperature`."""
+    setpoint = calculateSetpoint(temperature)
+    self.south.query(f"s{setpoint}")
 
 
 def calculateTemperature(voltage):

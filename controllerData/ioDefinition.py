@@ -108,26 +108,13 @@ class InputOutput:
             self.tfDevices[self.tfMap['HAT']].set_sleep_mode(30, 1, True, False, True)
         except (AttributeError, KeyError):
             pass
-        # Read sensor data
-        data = {}
-        try:  # Read the air quality bricklet.
-            iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
-        except tfError as exc:
-            if exc.value == tfError.TIMEOUT:
-                del self.tfDevices[self.tfMap['airQuality']]
-                del self.tfMap['airQuality']
-        except (AttributeError, KeyError):
-            pass
+        try:  # Read the sensors.
+            data = sensors.getData(self)
+            assert type(data) == dict
+        except (AttributeError, AssertionError):
+            return {}
         else:
-            data['airQuality'] = iaq
-            data['temperature'] = temp / 100
-            data['humidity'] = humidity / 100
-            data['airPressure'] = pressure / 100
-        try:  # Read the other sensors.
-            data.update(sensors.getData(self))
-        except AttributeError:
-            pass
-        return data
+            return data
 
     def setOutput(self, name, value):
         """Set the output with `name` to `value` in V."""

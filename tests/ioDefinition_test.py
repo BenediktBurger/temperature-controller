@@ -201,21 +201,13 @@ class Test_getSensors:
         ioDefinition.InputOutput.getSensors(skeleton)
         assert skeleton.tfDevices['abc'].args == (30, 1, True, False, True)
 
-    def test_getSensors_TF(self, skeleton):
-        skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
-        skeleton.tfMap['airQuality'] = 'abc'
-        assert ioDefinition.InputOutput.getSensors(skeleton) == {'airPressure': 5.0, 'airQuality': 100, 'humidity': 4.0, 'temperature': 3.0}
-
-    def test_getSensors_TF_connection_lost(self, skeleton, timeout):
-        skeleton.tfDevices['abc'] = Mock_BrickletAirQuality()
-        skeleton.tfDevices['abc'].get_all_values = timeout
-        skeleton.tfMap['airQuality'] = 'abc'
-        ioDefinition.InputOutput.getSensors(skeleton)
-        assert 'abc' not in skeleton.tfDevices.keys()
-
     def test_call_sensors(self, empty, monkeypatch):
         monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {'test': True})
         assert ioDefinition.InputOutput.getSensors(empty) == {'test': True}
+
+    def test_call_sensors_no_dictionary(self, empty, monkeypatch):
+        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: [])
+        assert ioDefinition.InputOutput.getSensors(empty) == {}
 
 
 def test_setOutput_Not_Connected(skeletonP, capsys):
