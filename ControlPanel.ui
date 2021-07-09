@@ -121,7 +121,7 @@
           </palette>
          </property>
          <property name="toolTip">
-          <string>Shut down the temperature controller</string>
+          <string>Shut down the temperature controller.</string>
          </property>
          <property name="text">
           <string>Shut down controller</string>
@@ -245,7 +245,7 @@
     <item row="0" column="1" rowspan="3">
      <widget class="QGroupBox" name="gbPID">
       <property name="toolTip">
-       <string>Id of the PID controller.</string>
+       <string/>
       </property>
       <property name="title">
        <string>PID</string>
@@ -291,6 +291,9 @@
        </item>
        <item row="2" column="1">
         <widget class="QDoubleSpinBox" name="sbSetpoint">
+         <property name="toolTip">
+          <string>Setpoint for the PID controller.</string>
+         </property>
          <property name="suffix">
           <string> °C</string>
          </property>
@@ -617,7 +620,8 @@
        <item row="1" column="1">
         <widget class="QLineEdit" name="leSensor">
          <property name="toolTip">
-          <string>Name of the sensor which should be stabilized.</string>
+          <string>Name of the sensor which should be stabilized.
+If several, comma separated sensor names are given, the first one with valid data is used.</string>
          </property>
         </widget>
        </item>
