@@ -78,7 +78,7 @@ def chPP(chP, empty):
 def sets(monkeypatch):
     settings = QtCore.QSettings('NLOQO', "tests")
     monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
-    yield
+    yield settings
     settings.clear()
 
 
@@ -196,9 +196,9 @@ class Test_handler_getValue:
             ch.getValue(pickle.dumps(5))
 
     def test_some_value(self, ch, sets):
-        sets.value('testing', 5)
+        sets.setValue('testing', 5)
         ch.getValue(pickle.dumps(["testing"]))
-        assert message[2] == pickle.dumps({'testing': 5})
+        assert pickle.loads(message[2]) == {'testing': 5}
 
     def test_getValue_errors(self, ch):
         ch.controller.errors = {'test': "value"}
