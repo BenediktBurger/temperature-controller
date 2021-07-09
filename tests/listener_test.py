@@ -11,6 +11,7 @@ import pytest
 
 # auxiliary for fixtures and tests
 import pickle
+from PyQt5 import QtCore
 import socket
 
 from devices import intercom
@@ -38,7 +39,7 @@ class Mock_PID:
 def disable_network(monkeypatch, connection):
     def new_sendMessage(*args, **kwargs):
         global message
-        message = list(args)
+        message = list(args)  # instance, type, content
 
     def new_readMessage(connection=connection):
         return typ, content
@@ -71,6 +72,14 @@ def chPP(chP, empty):
     chP.controller.inputOutput.tfCon = empty
     chP.controller.inputOutput.tfCon.enumerate = passing
     return chP
+
+
+@pytest.fixture
+def sets(monkeypatch):
+    settings = QtCore.QSettings('NLOQO', "tests")
+    monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+    yield
+    settings.clear()
 
 
 class Test_listener():
@@ -149,9 +158,7 @@ class Test_handler_run():
         assert message[1] == 'ERR'
 
 
-class Test_handler_general():
-    """Test the connectionHandler in general"""
-
+class Test_handler_setValue:
     def test_setValue_wrong_input(self, ch):
         with pytest.raises(AssertionError) as excinfo:
             ch.setValue(pickle.dumps([]))
@@ -161,6 +168,23 @@ class Test_handler_general():
         ch.setValue(pickle.dumps({}))
         assert message[1] == "ACK"
 
+    def test_some_value(self, ch, sets):
+        ch.setValue(pickle.dumps({'testing': 5}))
+        assert sets.value('testing') == 5
+        assert message[1] == 'ACK'
+
+    def test_pid_value(self, ch, qtbot, sets):
+        with qtbot.waitSignal(ch.signals.pidChanged) as blocker:
+            ch.setValue(pickle.dumps({'pid0/test': 5}))
+        assert blocker.args == ["0"]
+
+    def test_timer_changed(self, ch, qtbot, sets):
+        with qtbot.waitSignal(ch.signals.timerChanged) as blocker:
+            ch.setValue(pickle.dumps({'readoutInterval': 5}))
+        assert blocker.args == ['readoutTimer', 5]
+
+
+class Test_handler_getValue:
     def test_getValue(self, ch):
         ch.getValue(pickle.dumps(["pid0"]))
         content = pickle.loads(message[2])
@@ -171,11 +195,20 @@ class Test_handler_general():
         with pytest.raises(AssertionError):
             ch.getValue(pickle.dumps(5))
 
+    def test_some_value(self, ch, sets):
+        sets.value('testing', 5)
+        ch.getValue(pickle.dumps(["testing"]))
+        assert message[2] == pickle.dumps({'testing': 5})
+
     def test_getValue_errors(self, ch):
         ch.controller.errors = {'test': "value"}
         ch.getValue(pickle.dumps(['errors']))
         content = pickle.loads(message[2])
         assert content == {'errors': {'test': "value"}}
+
+
+class Test_handler_general:
+    """Test the connectionHandler in general"""
 
     def test_delValue(self, ch):
         ch.controller.errors = {'test': "value"}

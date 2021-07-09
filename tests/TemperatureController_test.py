@@ -12,6 +12,7 @@ import pytest
 # for fixtures
 from PyQt5 import QtCore
 import psycopg2
+from simple_pid import PID
 
 from controllerData import connectionData, listener
 
@@ -26,10 +27,13 @@ class Mock_Controller:
         self.pidState = {}
         self.pidSensor = {}
         self.test_output = {}
+
     def setOutput(self, name, value):
         self.test_output[name] = value
+
     def writeDatabase(self, data):
         self.test_database = data
+
 
 class Mock_App:
     def __init__(self):
@@ -45,20 +49,25 @@ class Mock_App:
     def quit(self):
         pass
 
+
 class Mock_App_Instance:
     def instance():
         return Mock_App()
 
+
 class Mock_Settings:
     def __init__(self, data={}):
         self.data = data  # Dictionary for settings.
+
     def value(self, key, defaultValue=None, type=None):
         try:
             return self.data[key]
         except KeyError:
             return defaultValue
+
     def setValue(self, key, value):
         self.data[key] = value
+
 
 class Mock_Listener:
     def __init__(self, host=None, port=-1, threadpool=None, controller=None):
@@ -70,15 +79,20 @@ class Mock_Listener:
     def moveToThread(self, name=""):
         pass
 
+
 class Mock_InputOutput:
     def __init__(self, controller=None):
         self.test_output = {}
+
     def close(self):
         pass
+
     def executeCommand(self, command):
         assert command == "valid", "Invalid command"
+
     def getSensors(self):
         return {'0': 0, '1': 1}
+
     def setOutput(self, name, value):
         self.test_output[name] = value
 
@@ -86,8 +100,10 @@ class Mock_InputOutput:
 class Cursor:
     def __init__(self, parent):
         self.parent = parent
+
     def __enter__(self):
         return self
+
     def execute(self, text, data):
         _, *values = data
         if "fail" == values[0]:
@@ -96,6 +112,7 @@ class Cursor:
             raise psycopg2.InterfaceError
         else:
             self.parent.executed = [text, data]
+
     def __exit__(self, *args, **kwargs):
         pass
 
@@ -103,10 +120,13 @@ class Cursor:
 class Mock_Database:
     def close(self):
         pass
+
     def cursor(self):
         return Cursor(self)
+
     def commit(self):
         self.committed = True
+
     def rollback(self):
         self.rollbacked = True
 
@@ -115,35 +135,43 @@ class Mock_Database:
 def controller():
     return Mock_Controller()
 
+
 @pytest.fixture
 def mock_io(controller):
     controller.inputOutput = Mock_InputOutput()
     return controller
+
 
 @pytest.fixture
 def mock_settings(controller):
     controller.settings = Mock_Settings()
     return controller
 
+
 @pytest.fixture
 def database():
     return Mock_Database()
+
 
 @pytest.fixture
 def replace_application(monkeypatch):
     monkeypatch.setattr(QtCore, "QCoreApplication", Mock_App_Instance)
 
+
 @pytest.fixture
 def replace_listener(monkeypatch):
     monkeypatch.setattr("controllerData.listener.Listener", Mock_Listener)
+
 
 @pytest.fixture
 def replace_io(monkeypatch):
     monkeypatch.setattr("controllerData.ioDefinition.InputOutput", Mock_InputOutput)
 
+
 @pytest.fixture
 def replace_database(monkeypatch, connection):
     monkeypatch.setattr('psycopg2.connect', lambda **kwargs: connection)
+
 
 class Test_Controller_init:
     @pytest.fixture
@@ -155,11 +183,12 @@ class Test_Controller_init:
     def test_init(self, controller):
         assert controller.errors == {'pid0Sensor': True, 'pid1Sensor': True}
 
+
 class Test_connectDatabase:
     def test_connectDatabase_close_existent(self, empty, replace_database, connection):
         empty.database = connection
         TemperatureController.TemperatureController.connectDatabase(empty)
-        assert connection.open == False
+        assert not connection.open
 
     def test_connectDatabase_load_config(self, empty, monkeypatch):
         monkeypatch.setattr('psycopg2.connect', lambda **kwargs: kwargs)
@@ -175,17 +204,88 @@ class Test_connectDatabase:
         assert not hasattr(controller, 'database')
 
 
-class Test_setupPID:
+class Test_setupPID_defaults:
     @pytest.fixture(autouse=True)
-    def pid(self, controller, empty):
-        def set_auto_mode(*args):
-            pass
-        controller.pids['0'] = empty
-        controller.pids['0'].set_auto_mode = set_auto_mode
+    def pid(self, controller):
+        controller.pids['0'] = PID(auto_mode=False)
+        return controller.pids['0']
 
-    def test_setupPID(self, controller):
-        TemperatureController.TemperatureController.setupPID(controller, '0')
+    @pytest.fixture(autouse=True)
+    def setupPID(self, controller, pid):
+        return TemperatureController.TemperatureController.setupPID(controller, '0')
+
+    def test_limits(self, pid):
+        assert pid.output_limits == (None, None)
+
+    def test_tunings(self, pid):
+        assert pid.tunings == (1, 0, 0)  # Kp, Ki, Kd
+
+    def test_setpoint(self, pid):
+        assert pid.setpoint == 22.2
+
+    def test_auto_mode(self, pid):
+        assert pid.auto_mode
+
+    def test_integral(self, pid):
+        assert pid._integral == 0
+
+    def test_state(self, controller):
+        assert controller.pidState['0'] == 0
+
+    def test_sensor_error(self, controller):
         assert controller.errors['pid0Sensor']
+
+
+class Test_setupPID_settings:
+    @pytest.fixture(autouse=True)
+    def pid(self, controller):
+        controller.pids['0'] = PID(auto_mode=False)
+        return controller.pids['0']
+
+    @pytest.fixture(autouse=True)
+    def sets(self, monkeypatch):
+        settings = QtCore.QSettings('NLOQO', "tests")
+        settings.beginGroup('pid0')
+        settings.setValue('lowerLimit', 0)
+        settings.setValue('upperLimit', 10)
+        settings.setValue('Kp', 5)
+        settings.setValue('Ki', 4)
+        settings.setValue('Kd', 3)
+        settings.setValue('setpoint', 15)
+        settings.setValue('autoMode', True)
+        settings.setValue('lastOutput', 2)
+        settings.setValue('state', 1)
+        settings.setValue('sensor', "sensor0, sensor1")
+        settings.endGroup()
+        monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+        yield
+        settings.clear()
+
+    @pytest.fixture(autouse=True)
+    def setupPID(self, controller, pid, sets):
+        return TemperatureController.TemperatureController.setupPID(controller, '0')
+
+    def test_limits(self, pid):
+        assert pid.output_limits == (0, 10)
+
+    def test_tunings(self, pid):
+        assert pid.tunings == (5, 4, 3)  # Kp, Ki, Kd
+
+    def test_setpoint(self, pid):
+        assert pid.setpoint == 15
+
+    def test_auto_mode(self, pid):
+        assert pid.auto_mode
+
+    def test_integral(self, pid):
+        assert pid._integral == 2
+
+    def test_state(self, controller):
+        assert controller.pidState['0'] == 1
+
+    def test_sensor_error(self, controller):
+        assert controller.pidSensor['0'] == ["sensor0", "sensor1"]
+
 
 def test_sendSensorCommand(controller, mock_io):
     TemperatureController.TemperatureController.sendSensorCommand(controller, 'valid')
@@ -234,9 +334,11 @@ def test_setOutput_invalid_name(controller):
     TemperatureController.TemperatureController.setOutput(controller, '3', 5)
     assert 'outputName' in controller.errors.keys()
 
+
 def test_setOutput_state_disabled(controller, mock_io):
     TemperatureController.TemperatureController.setOutput(controller, '0', 5)
     assert controller.inputOutput.test_output == {}
+
 
 def test_setOutput(controller, mock_io):
     controller.pidState['0'] = True
