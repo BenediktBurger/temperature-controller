@@ -102,15 +102,18 @@ def timeout():
         raise tfError(tfError.TIMEOUT, 'test')
     return timingout
 
+
 @pytest.fixture
 def controller(empty):
     empty.errors = {}
     return empty
 
+
 @pytest.fixture
 def skeletonP(skeleton, controller):
     skeleton.controller = controller
     return skeleton
+
 
 @pytest.fixture
 def calling():
@@ -118,6 +121,21 @@ def calling():
         global called
         called = True
     return callingf
+
+
+@pytest.fixture
+def raisingAssertion():
+    def raising(*args):
+        raise AssertionError
+    return raising
+
+
+@pytest.fixture
+def raising():
+    def raisingf(*args):
+        raise Exception('test')
+    return raisingf
+
 
 # General and tinkerforge tests.
 def test_setupTinkerforge_False(empty, monkeypatch):
@@ -137,6 +155,7 @@ def test_deviceConnected(mock_tinkerforge, skeleton, tf_device_pars, device_iden
     ioDefinition.InputOutput.deviceConnected(skeleton, *tf_device_pars)
     assert skeleton.tfDevices[uid] == (uid, 0)
     assert skeleton.tfMap[name] == uid
+
 
 def test_deviceConnected_available(skeleton, mock_tinkerforge, tf_device_pars, capsys):
     tf_device_pars[6] = 0
@@ -190,6 +209,11 @@ class Test_close:
         ioDefinition.InputOutput.close(empty)
         assert called
 
+    def test_close_sensors_failed(self, skeletonP, monkeypatch, raising):
+        monkeypatch.setattr('controllerData.sensors.close', raising)
+        ioDefinition.InputOutput.close(skeletonP)
+        assert 'sensorsClose' in skeletonP.controller.errors.keys()
+
 
 class Test_getSensors:
     def test_getSensors_Clean(self, empty):
@@ -209,16 +233,23 @@ class Test_getSensors:
         monkeypatch.setattr('controllerData.sensors.getData', lambda *args: [])
         assert ioDefinition.InputOutput.getSensors(empty) == {}
 
+    def test_call_sensors_failed(self, skeletonP, monkeypatch, raising):
+        monkeypatch.setattr('controllerData.sensors.getData', raising)
+        ioDefinition.InputOutput.getSensors(skeletonP)
+        assert 'sensorsGet' in skeletonP.controller.errors.keys()
+
 
 def test_setOutput_Not_Connected(skeletonP, capsys):
     ioDefinition.InputOutput.setOutput(skeletonP, '1', 100)
     assert skeletonP.controller.errors['analogOut1'] == "Not connected."
+
 
 def test_setOutput_connection_lost(skeleton):
     skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
     skeleton.tfMap['analogOut1'] = 'ao3'
     ioDefinition.InputOutput.setOutput(skeleton, '1', -1)
     assert 'ao3' not in skeleton.tfDevices.keys()
+
 
 def test_setOutput(skeleton):
     skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
