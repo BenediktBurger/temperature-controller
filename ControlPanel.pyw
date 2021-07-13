@@ -204,25 +204,26 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Get all the values for the selected PID controller."""
         name = f"pid{self.bbId.currentText()}"
         keys = [f"{name}/setpoint", f"{name}/Kp", f"{name}/Ki", f"{name}/Kd",
-                f"{name}/lowerLimit", f"{name}/upperLimit", f"{name}/sensor",
-                f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state"]
+                f"{name}/lowerLimit", f"{name}/lowerLimitNone", f"{name}/upperLimit", f"{name}/upperLimitNone",
+                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state"]
         try:
             typ, data = self.sendObject('GET', keys)
         except Exception as exc:
             self.showError(exc)
         else:
+            print(data)
             self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
             self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
             self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
             self.sbKd.setValue(self.gotToFloat(data[keys[3]]))
             self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
-            self.cbLowerLimit.setChecked(True if data[keys[4]] is None else False)
-            self.sbUpperLimit.setValue(self.gotToFloat(data[keys[5]]))
-            self.cbUpperLimit.setChecked(True if data[keys[5]] is None else False)
-            self.leSensor.setText(data[keys[6]])
-            self.cbAutoMode.setChecked(False if data[keys[7]] is False else True)
-            self.sbLastOutput.setValue(self.gotToFloat(data[keys[8]]))
-            self.bbOutput.setCurrentIndex(int(self.gotToFloat(data[keys[9]])))
+            self.cbLowerLimit.setChecked(False if data[keys[5]] in ("0", "false") else True)
+            self.sbUpperLimit.setValue(self.gotToFloat(data[keys[6]]))
+            self.cbUpperLimit.setChecked(False if data[keys[7]] in ("0", "false") else True)
+            self.leSensor.setText(data[keys[8]])
+            self.cbAutoMode.setChecked(False if data[keys[9]] in ("0", "false") else True)
+            self.sbLastOutput.setValue(self.gotToFloat(data[keys[10]]))
+            self.bbOutput.setCurrentIndex(int(self.gotToFloat(data[keys[11]])))
             self.changedPID.clear()  # Reset changed dictionary.
 
     def gotToFloat(self, received):
@@ -278,8 +279,9 @@ class ControlPanel(QtWidgets.QMainWindow):
     def changedUpperLimitNone(self, checked):
         """Store the None value of upper limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = None
+            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = True
         else:
+            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = False
             self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = self.sbUpperLimit.value()
 
     @pyqtSlot(float)
@@ -291,8 +293,9 @@ class ControlPanel(QtWidgets.QMainWindow):
     def changedLowerLimitNone(self, checked):
         """Store the None value of lower limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = None
+            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = True
         else:
+            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = False
             self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = self.sbLowerLimit.value()
 
     @pyqtSlot()

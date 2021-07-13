@@ -89,14 +89,14 @@ class TemperatureController(QtCore.QObject):
         pid = self.pids[name]
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{name}')
-        pid.output_limits = (settings.value('lowerLimit', defaultValue=None),
-                             settings.value('upperLimit', defaultValue=None))
+        pid.output_limits = (None if settings.value('lowerLimitNone', defaultValue=True, type=bool) else settings.value('lowerLimit', type=float),
+                             None if settings.value('upperLimitNone', defaultValue=True, type=bool) else settings.value('upperLimit', type=float))
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
         pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
         pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
-                          settings.value('lastOutput', defaultValue=None))
+                          settings.value('lastOutput', defaultValue=0, type=float))
         self.pidState[name] = settings.value('state', defaultValue=0, type=int)
         sensors = settings.value('sensor', defaultValue="", type=str).replace(' ', '').split(',')
         if sensors == ['']:

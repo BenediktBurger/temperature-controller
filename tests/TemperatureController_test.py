@@ -247,7 +247,9 @@ class Test_setupPID_settings:
         settings = QtCore.QSettings('NLOQO', "tests")
         settings.beginGroup('pid0')
         settings.setValue('lowerLimit', 0)
+        settings.setValue('lowerLimitNone', False)
         settings.setValue('upperLimit', 10)
+        settings.setValue('upperLimitNone', True)
         settings.setValue('Kp', 5)
         settings.setValue('Ki', 4)
         settings.setValue('Kd', 3)
@@ -266,7 +268,7 @@ class Test_setupPID_settings:
         return TemperatureController.TemperatureController.setupPID(controller, '0')
 
     def test_limits(self, pid):
-        assert pid.output_limits == (0, 10)
+        assert pid.output_limits == (0, None)
 
     def test_tunings(self, pid):
         assert pid.tunings == (5, 4, 3)  # Kp, Ki, Kd
