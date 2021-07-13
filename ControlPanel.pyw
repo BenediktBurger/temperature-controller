@@ -211,7 +211,6 @@ class ControlPanel(QtWidgets.QMainWindow):
         except Exception as exc:
             self.showError(exc)
         else:
-            print(data)
             self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
             self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
             self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
