@@ -216,10 +216,14 @@ class Test_close:
 
 
 class Test_getSensors:
-    def test_getSensors_Clean(self, empty):
+    @pytest.fixture
+    def sensorsGetData(self, monkeypatch):
+        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {})
+
+    def test_getSensors_Clean(self, empty, sensorsGetData):
         assert ioDefinition.InputOutput.getSensors(empty) == {}
 
-    def test_renew_watchdog(self, skeleton):
+    def test_renew_watchdog(self, skeleton, sensorsGetData):
         skeleton.tfDevices['abc'] = Mock_BrickHAT()
         skeleton.tfMap['HAT'] = 'abc'
         ioDefinition.InputOutput.getSensors(skeleton)
