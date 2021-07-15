@@ -48,7 +48,7 @@ class InputOutput:
         except AttributeError:
             pass
         except Exception as exc:
-            self.controller.errors['sensorsInit'] = exc
+            self.controller.errors['sensorsInit'] = f"{type(exc).__name__}: {exc}"
 
     def setupTinkerforge(self):
         """Create the tinkerforge connection."""
@@ -95,7 +95,7 @@ class InputOutput:
         except AttributeError:
             pass  # No sensors file.
         except Exception as exc:
-            self.controller.errors['sensorsClose'] = exc
+            self.controller.errors['sensorsClose'] = f"{type(exc).__name__}: {exc}"
         try:  # Deactivate Watchdog.
             self.tfDevices[self.tfMap['HAT']].set_sleep_mode(0, 0, False, False, False)
         except (AttributeError, KeyError):
@@ -118,7 +118,7 @@ class InputOutput:
         except (AttributeError, AssertionError):
             return {}
         except Exception as exc:
-            self.controller.errors['sensorsGet'] = exc
+            self.controller.errors['sensorsGet'] = f"{type(exc).__name__}: {exc}"
             return {}
         else:
             return data

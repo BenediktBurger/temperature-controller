@@ -212,7 +212,7 @@ class Test_close:
     def test_close_sensors_failed(self, skeletonP, monkeypatch, raising):
         monkeypatch.setattr('controllerData.sensors.close', raising)
         ioDefinition.InputOutput.close(skeletonP)
-        assert 'sensorsClose' in skeletonP.controller.errors.keys()
+        assert skeletonP.controller.errors['sensorsClose'] == "Exception: test"
 
 
 class Test_getSensors:
@@ -236,7 +236,7 @@ class Test_getSensors:
     def test_call_sensors_failed(self, skeletonP, monkeypatch, raising):
         monkeypatch.setattr('controllerData.sensors.getData', raising)
         ioDefinition.InputOutput.getSensors(skeletonP)
-        assert 'sensorsGet' in skeletonP.controller.errors.keys()
+        assert skeletonP.controller.errors['sensorsGet'] == "Exception: test"
 
 
 def test_setOutput_Not_Connected(skeletonP, capsys):
