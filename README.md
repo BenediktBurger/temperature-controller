@@ -11,6 +11,11 @@ Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Or
 
 ### Controller
 
+Zur Installation gibt es ein Shell-Script *Setup.sh*, das die meisten Schritte automatisch ausführt. Es bleiben die lokale Konfiguration (*connectionData.py* und *sensors.py*) und das erste Starten übrig.
+
+Die einzelnen Schritte sind folgend erklärt.
+
+
 ### Der Controller selbst
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
 * Im Ordner controllerData die Datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: `database = {'host': "hostname",...}`. Alternativ kann die Datei *connectionData-sample.py* an die eigenen Bedürfnisse angepasst und umbenannt werden.

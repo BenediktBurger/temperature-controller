@@ -1,17 +1,10 @@
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-Test/
-dist/
-build/
 
+local/
 .ignore*
 *.no.lnk
-DataAnalysis/da*/
 
-
-*.egg-info
-cmd.lnk
 desktop.ini
 
 controllerData/connectionData.py
