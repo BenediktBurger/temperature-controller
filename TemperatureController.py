@@ -118,7 +118,10 @@ class TemperatureController(QtCore.QObject):
 
         # Close the sensor and database
         self.inputOutput.close()
-        self.database.close()
+        try:
+            self.database.close()
+        except AttributeError:
+            pass  # No database connection.
 
         # Stop the Application.
         if qtVersion == 6:
@@ -139,7 +142,7 @@ class TemperatureController(QtCore.QObject):
         except AttributeError:
             pass  # no database present
         try:
-            self.database = psycopg2.connect(**connectionData.database)
+            self.database = psycopg2.connect(**connectionData.database, connect_timeout=5)
         except Exception as exc:
             self.errors['database'] = f"Database connection error {type(exc).__name__}: {exc}."
 
