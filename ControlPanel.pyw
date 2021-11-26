@@ -79,6 +79,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         #   Errors
         self.pbErrorsGet.clicked.connect(self.getErrors)
         self.pbErrorsClear.clicked.connect(self.clearErrors)
+        self.pbSensors.clicked.connect(self.getSensors)
 
         # Connect to the controller
         self.connect()
@@ -331,6 +332,7 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def resetPID(self):
+        """Send the command to reset the PID values of the current controller."""
         try:
             self.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
         except Exception as exc:
@@ -338,6 +340,7 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def getErrors(self):
+        """Show the current errors dictionary as a table."""
         try:
             typ, data = self.sendObject('GET', ['errors'])
             errors = data['errors']
@@ -349,16 +352,33 @@ class ControlPanel(QtWidgets.QMainWindow):
                 text += f"{key}:\t{errors[key]}\n"
             if text == "":
                 text = "None"
-            self.lbErrors.setText(text)
+            self.lbReadout.setText(text)
 
     @pyqtSlot()
     def clearErrors(self):
+        """Clear the remote errors dictionary, afterwards read and show the errors."""
         try:
             typ, data = self.sendObject('DEL', ['errors'])
         except Exception as exc:
             self.showError(exc)
         else:
             self.getErrors()
+
+    @pyqtSlot()
+    def getSensors(self):
+        """Get the current sensors and values and show them as a table."""
+        try:
+            typ, data = self.sendObject('GET', ['data'])
+            sensors = data['data']
+        except Exception as exc:
+            self.showError(exc)
+        else:
+            text = ""
+            for key in sensors.keys():
+                text += f"{key}:\t{sensors[key]}\n"
+            if text == "":
+                text = "None"
+            self.lbReadout.setText(text)
 
 
 if __name__ == '__main__':  # if this is the started script file
