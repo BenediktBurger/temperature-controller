@@ -40,7 +40,8 @@ class TemperatureController(QtCore.QObject):
         self.settings = settings
 
         # General config
-        self.errors = {}  # error dictionary
+        self.errors = {}  # Error dictionary.
+        self.data = {}  # Current data dictionary.
 
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
@@ -177,6 +178,7 @@ class TemperatureController(QtCore.QObject):
                     break  # Valid sensor found: stop loop.
         for key in output.keys():
             data[f'pidOutput{key}'] = output[key]
+        self.data = data
         self.writeDatabase(data)
 
     @pyqtSlot(str, float)

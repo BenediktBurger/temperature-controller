@@ -164,6 +164,8 @@ class ConnectionHandler(QtCore.QRunnable):
         for key in keys:
             if key == 'errors':
                 data[key] = self.controller.errors
+            elif key == 'data':
+                data[key] = self.controller.data
             else:
                 data[key] = settings.value(key)
         intercom.sendMessage(self.connection, 'SET', pickle.dumps(data))
