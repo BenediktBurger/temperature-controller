@@ -1,0 +1,9 @@
+# Required Python packages
+
+numpy
+PyQt5
+pytest
+pytest-qt
+psycopg2
+simple_pid
+tinkerforge
