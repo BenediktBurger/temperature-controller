@@ -103,8 +103,9 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     def connect(self):
         """Create a communicator object."""
-        self.com = intercom.Intercom(self.settings.value('IPaddress', defaultValue="127.0.0.1", type=str),
-                                     self.settings.value('port', defaultValue=22001, type=int))
+        self.com = intercom.Intercom(self.settings.value('IPaddress',
+                                                         "127.0.0.1", str),
+                                     self.settings.value('port', 22001, int))
 
     def showError(self, exc=None):
         """Show an error message."""
@@ -115,7 +116,9 @@ class ControlPanel(QtWidgets.QMainWindow):
             icon = QtWidgets.QMessageBox.Warning
         message.setIcon(icon)
         message.setWindowTitle("Communication error")
-        message.setText("A communication error occurred, please check the connection settings and whether the temperature controller is running.")
+        message.setText(("A communication error occurred, please check the "
+                         "connection settings and whether the temperature "
+                         "controller is running."))
         if exc is not None:
             message.setDetailedText(f"{type(exc).__name__}: {exc}")
         message.exec()
@@ -139,7 +142,8 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.showError(exc)
         else:
             self.leDatabaseTable.setText(data['database/table'])
-            self.sbReadoutInterval.setValue(5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
+            self.sbReadoutInterval.setValue(
+                5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
 
     @pyqtSlot()
     def setGeneral(self):
@@ -184,10 +188,14 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Ask for confirmation and send shut down command."""
         confirmation = QtWidgets.QMessageBox()
         confirmation.setWindowTitle("Really shut down?")
-        confirmation.setText("Do you want to shut down the temperature controller? You can not start it with this program, but have to do it on the computer itself!")
+        confirmation.setText(("Do you want to shut down the temperature "
+                              "controller? You can not start it with this "
+                              "program, but have to do it on the computer "
+                              "itself!"))
         if qtVersion == 6:
             icon = QtWidgets.QMessageBox.Icon.Question
-            buttons = [QtWidgets.QMessageBox.StandardButtons.Yes, QtWidgets.QMessageBox.StandardButtons.Cancel]
+            buttons = [QtWidgets.QMessageBox.StandardButtons.Yes,
+                       QtWidgets.QMessageBox.StandardButtons.Cancel]
         else:
             icon = QtWidgets.QMessageBox.Question
             buttons = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
@@ -206,7 +214,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         name = f"pid{self.bbId.currentText()}"
         keys = [f"{name}/setpoint", f"{name}/Kp", f"{name}/Ki", f"{name}/Kd",
                 f"{name}/lowerLimit", f"{name}/lowerLimitNone", f"{name}/upperLimit", f"{name}/upperLimitNone",
-                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state"]
+                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state", f"{name}/output"]
         try:
             typ, data = self.sendObject('GET', keys)
         except Exception as exc:
@@ -227,7 +235,7 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.changedPID.clear()  # Reset changed dictionary.
 
     def gotToFloat(self, received):
-        """Turn a received number into a float, because sometimes it is a string"""
+        """Turn a received number into a float."""
         if received is None:
             return 0
         return float(received)
@@ -332,7 +340,7 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def resetPID(self):
-        """Send the command to reset the PID values of the current controller."""
+        """Send a command to reset the PID values of the current controller."""
         try:
             self.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
         except Exception as exc:
@@ -356,7 +364,7 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def clearErrors(self):
-        """Clear the remote errors dictionary, afterwards read and show the errors."""
+        """Clear the remote errors dictionary, afterwards show the errors."""
         try:
             typ, data = self.sendObject('DEL', ['errors'])
         except Exception as exc:
