@@ -5,7 +5,8 @@ Example configuration of the local sensors.
 Adjust this file according to your needs.
 If a method is not required, just use 'pass'.
 
-The following methods have to be present:
+Necessary methods
+-----------------
 setup : self
     What to do at initialization.
 getData : self
@@ -13,12 +14,16 @@ getData : self
 close : self
     What to do at closure of the controller.
 
-This method can be present:
+Optional methods
+----------------
+setOutput : self, output, value
+    Set an output to a value
 executeCommand : self, command
     Handle the string `command`, for example change some device settings.
 
 
-All the other methods here are examples for routines outsourced from above methods.
+All the other methods here are examples for routines outsourced from above
+necessary or optional methods.
 """
 
 # Necessary for tinkerforge
@@ -33,8 +38,18 @@ import pyvisa
 def setup(self):
     """Configure the sensors."""
     self.rm = pyvisa.ResourceManager()
-    self.south = setupArduino(self.rm, "/dev/ttyACM0")
-    self.wde = setupWDE(self.rm)
+    try:
+        self.south = setupArduino(self.rm, "/dev/ArduinoSouth")
+    except Exception:
+        pass  # Setup failed, so no device stored.
+    try:
+        self.north = setupArduino(self.rm, "/dev/ArduinoNorth")
+    except Exception:
+        pass  # Setup failed, so no device stored.
+    try:
+        self.wde = setupWDE(self.rm)
+    except Exception:
+        pass  # Setup failed, so no device stored.
 
 
 def getData(self):
@@ -60,6 +75,11 @@ def getData(self):
     # airQuality.get_temperature() / 100  # in °C
     # airQuality.get_humidity() / 100  # relative air humidity in %
     # airQuality.get_air_pressure() / 100  # in hPa
+
+
+def setOutput(self, output, value):
+    """Set the additional `output` to `value`."""
+    print(f"{output} has now value {value}.")
 
 
 def executeCommand(self, command):
@@ -89,15 +109,18 @@ def close(self):
 def getAirQuality(self):
     """Read the air quality bricklet and return the data in a dictionary."""
     try:
-        iaq, iaqa, temp, humidity, pressure = self.tfDevices[self.tfMap['airQuality']].get_all_values()
+        bricklet = self.tfDevices[self.tfMap['airQuality']]
+    except (AttributeError, KeyError):
+        return {}
+    try:
+        iaq, iaqa, temp, humidity, pressure = bricklet.get_all_values()
     except tfError as exc:
         if exc.value == tfError.TIMEOUT:
             del self.tfDevices[self.tfMap['airQuality']]
             del self.tfMap['airQuality']
-    except (AttributeError, KeyError):
         return {}
     else:
-        return {'airQuality': iaq,
+        return {  # 'airQuality': iaq,
                 'temperature': temp / 100,
                 'humidity': humidity / 100,
                 'airPressure': pressure / 100,

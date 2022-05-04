@@ -10,7 +10,10 @@ Created on Sat Jun 19 08:17:59 2021 by Benedikt Moneke
 import pytest
 
 # for fixtures
-from PyQt5 import QtCore
+try:  # Qt for nice effects.
+    from PyQt6 import QtCore
+except ModuleNotFoundError:
+    from PyQt5 import QtCore
 import psycopg2
 from simple_pid import PID
 
@@ -26,6 +29,7 @@ class Mock_Controller:
         self.pids = {}
         self.pidState = {}
         self.pidSensor = {}
+        self.pidOutput = {}
         self.test_output = {}
 
     def setOutput(self, name, value):
@@ -175,14 +179,17 @@ def replace_database(monkeypatch, connection):
 
 class Test_Controller_init:
     @pytest.fixture
-    def controller(self, replace_application, replace_listener, replace_io, replace_database):
+    def controller(self, replace_application, replace_listener, replace_io,
+                   replace_database):
         contr = TemperatureController.TemperatureController()
         yield contr
         contr.stop()
 
-    def test_init(self, controller):
+    def test_errors(self, controller):
         assert controller.errors == {'pid0Sensor': True, 'pid1Sensor': True}
 
+    def default_pids(self, controller):
+        assert controller.pids.keys() == ('0', '1')
 
 class Test_connectDatabase:
     def test_connectDatabase_close_existent(self, empty, replace_database, connection):
@@ -193,6 +200,7 @@ class Test_connectDatabase:
     def test_connectDatabase_load_config(self, empty, monkeypatch):
         monkeypatch.setattr('psycopg2.connect', lambda **kwargs: kwargs)
         TemperatureController.TemperatureController.connectDatabase(empty)
+        del empty.database['connect_timeout']
         assert empty.database == connectionData.database
 
     def test_connectDatabase_fail(self, controller, monkeypatch):
@@ -260,6 +268,7 @@ class Test_setupPID_settings:
         settings.setValue('sensor', "sensor0, sensor1")
         settings.endGroup()
         monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+        monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
         yield
         settings.clear()
 
@@ -319,8 +328,9 @@ class Test_readoutTimeout:
 
     def test_pid_output(self, controller, pid_sensor):
         controller.pidState['0'] = 2
+        controller.pidOutput['0'] = 'out0'
         TemperatureController.TemperatureController.readTimeout(controller)
-        assert controller.test_output['0'] == 0
+        assert controller.test_output['out0'] == 0
 
     def test_pid_second_sensor(self, controller, pid):
         controller.pidSensor['0'] = ['missing', '1']
@@ -332,20 +342,21 @@ class Test_readoutTimeout:
         assert not hasattr(controller, 'test_database')
 
 
-def test_setOutput_invalid_name(controller):
-    TemperatureController.TemperatureController.setOutput(controller, '3', 5)
-    assert 'outputName' in controller.errors.keys()
-
-
-def test_setOutput_state_disabled(controller, mock_io):
-    TemperatureController.TemperatureController.setOutput(controller, '0', 5)
-    assert controller.inputOutput.test_output == {}
-
-
-def test_setOutput(controller, mock_io):
-    controller.pidState['0'] = True
-    TemperatureController.TemperatureController.setOutput(controller, '0', 5)
-    assert controller.inputOutput.test_output['0'] == 5
+class Test_setOutput:
+    def test_invalid_name(self, controller):
+        class Raising_IO:
+            def setOutput(self, *args):
+                raise KeyError
+        controller.inputOutput = Raising_IO()
+        TemperatureController.TemperatureController.setOutput(controller, 'out3', 5)
+        assert 'outputName' in controller.errors.keys()
+    
+    def test_setOutput(self, mock_io):
+        controller = mock_io
+        controller.pidState['0'] = True
+        controller.pidOutput['0'] = "out0"
+        TemperatureController.TemperatureController.setOutput(controller, 'out0', 5)
+        assert controller.inputOutput.test_output['out0'] == 5
 
 
 class Test_writeDatabase:

@@ -120,6 +120,8 @@ def calling():
     def callingf(*args):
         global called
         called = True
+        global calledArgs
+        calledArgs = args
     return callingf
 
 
@@ -147,7 +149,7 @@ def test_setupTinkerforge_False(empty, monkeypatch):
 
 @pytest.mark.parametrize('device_identifier, name', [(297, 'airQuality'),
                                                      (111, 'HAT'),
-                                                     (2115, 'analogOut1')
+                                                     (2115, 'out1')
                                                      ])
 def test_deviceConnected(mock_tinkerforge, skeleton, tf_device_pars, device_identifier, name):
     tf_device_pars[5] = device_identifier
@@ -173,7 +175,7 @@ class Test_deviceDisconnected:
     def setup(self, skeleton, mock_tinkerforge, pars_modified):
         uid = pars_modified[0]
         skeleton.tfDevices[uid] = 5
-        skeleton.tfMap['analogOut0'] = uid
+        skeleton.tfMap['out0'] = uid
         return skeleton
 
     @pytest.fixture
@@ -244,19 +246,32 @@ class Test_getSensors:
 
 
 def test_setOutput_Not_Connected(skeletonP, capsys):
-    ioDefinition.InputOutput.setOutput(skeletonP, '1', 100)
-    assert skeletonP.controller.errors['analogOut1'] == "Not connected."
+    ioDefinition.InputOutput.setOutput(skeletonP, 'out1', 100)
+    assert skeletonP.controller.errors['out1'] == "Not connected."
 
 
 def test_setOutput_connection_lost(skeleton):
     skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
-    skeleton.tfMap['analogOut1'] = 'ao3'
-    ioDefinition.InputOutput.setOutput(skeleton, '1', -1)
+    skeleton.tfMap['out1'] = 'ao3'
+    ioDefinition.InputOutput.setOutput(skeleton, 'out1', -1)
     assert 'ao3' not in skeleton.tfDevices.keys()
 
 
-def test_setOutput(skeleton):
-    skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
-    skeleton.tfMap['analogOut1'] = 'ao3'
-    ioDefinition.InputOutput.setOutput(skeleton, '1', 9)
-    assert skeleton.tfDevices['ao3'].voltage == 9
+class Test_setOutput:
+    def test_tf(self, skeleton):
+        skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
+        skeleton.tfMap['out1'] = 'ao3'
+        ioDefinition.InputOutput.setOutput(skeleton, 'out1', 9)
+        assert skeleton.tfDevices['ao3'].voltage == 9
+
+    def test_external(self, skeleton, monkeypatch, calling):
+        monkeypatch.setattr('controllerData.sensors.setOutput', calling)
+        ioDefinition.InputOutput.setOutput(skeleton, 'out5', 2)
+        assert calledArgs == (skeleton, 'out5', 2)
+
+    def test_noSensorsFile(self, skeleton, monkeypatch):
+        def raising(*args):
+            raise AttributeError("xy")
+        monkeypatch.setattr('controllerData.sensors.setOutput', raising)
+        with pytest.raises(KeyError):
+            ioDefinition.InputOutput.setOutput(skeleton, 'out5', 2)

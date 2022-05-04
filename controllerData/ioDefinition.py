@@ -60,11 +60,13 @@ class InputOutput:
         tfCon.connect("localhost", 4223)  # values for local installation
         self.tfCon = tfCon
         tfCon.register_callback(IPConnection.CALLBACK_ENUMERATE, self.deviceConnected)
-        tfCon.enumerate()  # ask all bricks and bricklets to announce themselves.
+        tfCon.enumerate()  # ask all bricklets/bricklets to announce themselves
 
-    def deviceConnected(self, uid, connected_uid, position, hardware_version, firmware_version, device_identifier, enumeration_type):
+    def deviceConnected(self, uid, connected_uid, position, hardware_version,
+                        firmware_version, device_identifier, enumeration_type):
         """Store a connected thinkerforge device in the database."""
-        if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:  # AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
+        if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:
+            # Types: AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
             print(f"Device {'connected' if enumeration_type else 'available'}: {uid} at {position} of type {device_identifier}.")
             if uid not in self.tfDevices.keys():
                 self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
@@ -72,9 +74,9 @@ class InputOutput:
                 self.tfMap['HAT'] = uid
             elif device_identifier == BrickletAnalogOutV3.DEVICE_IDENTIFIER:
                 if position == 'a':
-                    self.tfMap['analogOut0'] = uid
+                    self.tfMap['out0'] = uid
                 else:
-                    self.tfMap['analogOut1'] = uid
+                    self.tfMap['out1'] = uid
             elif device_identifier == BrickletAirQuality.DEVICE_IDENTIFIER:
                 self.tfMap['airQuality'] = uid
         else:
@@ -124,16 +126,21 @@ class InputOutput:
             return data
 
     def setOutput(self, name, value):
-        """Set the output with `name` to `value` in V."""
-        key = f'analogOut{name}'
-        try:
-            self.tfDevices[self.tfMap[key]].set_output_voltage(value * 1000)
-        except (AttributeError, KeyError):
-            self.controller.errors[key] = "Not connected."
-        except tfError as exc:
-            if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
-                del self.tfDevices[self.tfMap[key]]
-                del self.tfMap[key]
+        """Set the output with `name` to `value` (for tinkerforge in V)."""
+        if name in ("out0", "out1"):
+            try:
+                self.tfDevices[self.tfMap[name]].set_output_voltage(value * 1000)
+            except (AttributeError, KeyError):
+                self.controller.errors[name] = "Not connected."
+            except tfError as exc:
+                if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
+                    del self.tfDevices[self.tfMap[name]]
+                    del self.tfMap[name]
+        else:
+            try:
+                sensors.setOutput(self, name, value)
+            except AttributeError as exc:
+                raise KeyError(exc)
 
     def executeCommand(self, command):
         """Send `command` to sensors."""

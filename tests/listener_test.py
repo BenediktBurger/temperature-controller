@@ -78,6 +78,7 @@ def chPP(chP, empty):
 def sets(monkeypatch):
     settings = QtCore.QSettings('NLOQO', "tests")
     monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+    monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
     yield settings
     settings.clear()
 
@@ -178,6 +179,11 @@ class Test_handler_setValue:
             ch.setValue(pickle.dumps({'pid0/test': 5}))
         assert blocker.args == ["0"]
 
+    def test_pid15_value(self, ch, qtbot, sets):
+        with qtbot.waitSignal(ch.signals.pidChanged) as blocker:
+            ch.setValue(pickle.dumps({'pid15/test': 5}))
+        assert blocker.args == ["15"]
+
     def test_timer_changed(self, ch, qtbot, sets):
         with qtbot.waitSignal(ch.signals.timerChanged) as blocker:
             ch.setValue(pickle.dumps({'readoutInterval': 5}))
@@ -225,13 +231,13 @@ class Test_handler_general:
         chP.executeCommand(content)
         assert chP.controller.pids['0'].resetted
 
-    @pytest.mark.parametrize('out, value', [('0', 15.3), ('1', "10"), ('3', "17.3")])
+    @pytest.mark.parametrize('out, value', [('0', 15.3), ('1', "10"), ('F3', "17.3")])
     def test_executeCommand_output(self, ch, qtbot, out, value):
         content = pickle.dumps([f'out{out}', value])
         with qtbot.waitSignal(ch.signals.setOutput) as blocker:
             ch.executeCommand(content)
         assert message[1] == 'ACK'
-        assert blocker.args == [out, float(value)]
+        assert blocker.args == [f'out{out}', float(value)]
 
     def test_executeCommand_output_no_name(self, ch):
         content = pickle.dumps(['out', ""])

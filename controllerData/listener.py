@@ -144,15 +144,15 @@ class ConnectionHandler(QtCore.QRunnable):
         data = pickle.loads(content)
         assert type(data) == dict, "The content has to be a dictionary."
         settings = QtCore.QSettings()
-        signals = {}
+        pidChanged = {}
         for key in data.keys():
             settings.setValue(key, data[key])
-            if 'pid' in key:
-                signals['pid'] = key[3]
+            if key.startswith('pid'):
+                pidChanged[key.split("/")[0]] = True
             if key == 'readoutInterval':
                 self.signals.timerChanged.emit('readoutTimer', data[key])
-        if 'pid' in signals.keys():
-            self.signals.pidChanged.emit(signals['pid'])
+        for key in pidChanged.keys():
+            self.signals.pidChanged.emit(key.replace("pid", ""))
         intercom.sendMessage(self.connection, 'ACK')
 
     def getValue(self, content):
@@ -197,9 +197,7 @@ class ConnectionHandler(QtCore.QRunnable):
             self.signals.sensorCommand.emit(command)
             intercom.sendMessage(self.connection, 'ACK')
         elif deviceName.startswith('out'):
-            try:
-                name = deviceName[3]
-            except IndexError:
+            if len(deviceName) < 4:
                 intercom.sendMessage(self.connection, 'ERR', "No output name given.".encode('ascii'))
                 return
             try:
@@ -207,7 +205,7 @@ class ConnectionHandler(QtCore.QRunnable):
             except ValueError:
                 intercom.sendMessage(self.connection, 'ERR', "Value is not a number.".encode('ascii'))
             else:
-                self.signals.setOutput.emit(name, value)
+                self.signals.setOutput.emit(deviceName, value)
                 intercom.sendMessage(self.connection, 'ACK')
         elif deviceName == 'tinkerforge' and command == 'enumerate':
             try:

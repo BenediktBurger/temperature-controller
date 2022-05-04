@@ -19,7 +19,8 @@ except ModuleNotFoundError:
 import psycopg2
 from simple_pid import PID
 
-from controllerData import connectionData  # file with the connection data in dictionaries: database = {'host': 'myres'...}.
+# local packages
+from controllerData import connectionData    # Data to connect to database.
 from controllerData import listener, ioDefinition
 
 
@@ -52,10 +53,12 @@ class TemperatureController(QtCore.QObject):
 
         # PID controllers
         self.pids = {}
-        self.pids['0'] = PID(auto_mode=False)  # in order to start with the last value
-        self.pids['1'] = PID(auto_mode=False)
+        for i in range(self.settings.value('pids', defaultValue=2, type=int)):
+            self.pids[str(i)] = PID(auto_mode=False)
+            # auto_mode false, in order to start with the last value.
         self.pidSensor = {}  # the main sensor of the PID
         self.pidState = {}  # state of the corresponding output: 0 off, 1 manual, 2 pid
+        self.pidOutput = {}  # Output device of the pid.
         for key in self.pids.keys():
             self.setupPID(key)
 
@@ -65,7 +68,7 @@ class TemperatureController(QtCore.QObject):
         self.connectDatabase()
 
         # Configure readoutTimer
-        self.readoutTimer.start(settings.value('readoutInterval', defaultValue=5000, type=int))
+        self.readoutTimer.start(settings.value('readoutInterval', 5000, int))
         self.readoutTimer.timeout.connect(self.readTimeout)
 
     def setupListener(self, settings):
@@ -90,19 +93,21 @@ class TemperatureController(QtCore.QObject):
         pid = self.pids[name]
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{name}')
-        pid.output_limits = (None if settings.value('lowerLimitNone', defaultValue=True, type=bool) else settings.value('lowerLimit', type=float),
-                             None if settings.value('upperLimitNone', defaultValue=True, type=bool) else settings.value('upperLimit', type=float))
+        pid.output_limits = (
+            None if settings.value('lowerLimitNone', True, bool) else settings.value('lowerLimit', type=float),
+            None if settings.value('upperLimitNone', True, bool) else settings.value('upperLimit', type=float))
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
-        pid.setpoint = settings.value('setpoint', defaultValue=22.2, type=float)
-        pid.set_auto_mode(settings.value('autoMode', defaultValue=True, type=bool),
-                          settings.value('lastOutput', defaultValue=0, type=float))
+        pid.setpoint = settings.value('setpoint', 22.2, type=float)
+        pid.set_auto_mode(settings.value('autoMode', True, type=bool),
+                          settings.value('lastOutput', 0, type=float))
         self.pidState[name] = settings.value('state', defaultValue=0, type=int)
-        sensors = settings.value('sensor', defaultValue="", type=str).replace(' ', '').split(',')
+        sensors = settings.value('sensor', type=str).replace(' ', '').split(',')
         if sensors == ['']:
             self.errors[f'pid{name}Sensor'] = True
         self.pidSensor[name] = sensors
+        self.pidOutput[name] = settings.value('output', f"out{name}", str)
 
     @pyqtSlot()
     def stop(self):
@@ -129,7 +134,8 @@ class TemperatureController(QtCore.QObject):
             connectionType = QtCore.Qt.ConnectionType.QueuedConnection
         else:
             connectionType = QtCore.Qt.QueuedConnection
-        self.stopApplication.connect(QtCore.QCoreApplication.instance().quit, type=connectionType)
+        self.stopApplication.connect(QtCore.QCoreApplication.instance().quit,
+                                     type=connectionType)
         self.stopApplication.emit()
         print("Stopped.")
 
@@ -174,7 +180,7 @@ class TemperatureController(QtCore.QObject):
                     pass
                 else:
                     if self.pidState[key] == 2:
-                        self.setOutput(key, output[key])
+                        self.setOutput(self.pidOutput[key], output[key])
                     break  # Valid sensor found: stop loop.
         for key in output.keys():
             data[f'pidOutput{key}'] = output[key]
@@ -185,8 +191,7 @@ class TemperatureController(QtCore.QObject):
     def setOutput(self, name, value):
         """Set the output with `name` to `value` if the state allows it."""
         try:
-            if self.pidState[name]:
-                self.inputOutput.setOutput(name, value)
+            self.inputOutput.setOutput(name, value)
         except KeyError:
             self.errors['outputName'] = f"Output '{name}' is unknown."
 
