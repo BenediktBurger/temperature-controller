@@ -6,7 +6,9 @@ Created on Mon Jun 14 11:12:51 2021 by Benedikt Moneke
 """
 
 import datetime
+import logging
 import sys
+import time
 
 try:  # Qt for nice effects.
     from PyQt6 import QtCore
@@ -22,6 +24,10 @@ from simple_pid import PID
 # local packages
 from controllerData import connectionData    # Data to connect to database.
 from controllerData import listener, ioDefinition
+
+log = logging.getLogger("TemperatureController")
+log.addHandler(logging.StreamHandler())  # log to stderr
+log.setLevel(logging.INFO)
 
 
 class TemperatureController(QtCore.QObject):
@@ -43,6 +49,7 @@ class TemperatureController(QtCore.QObject):
         # General config
         self.errors = {}  # Error dictionary.
         self.data = {}  # Current data dictionary.
+        self.last_value_set = time.time()
 
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
@@ -70,6 +77,7 @@ class TemperatureController(QtCore.QObject):
         # Configure readoutTimer
         self.readoutTimer.start(settings.value('readoutInterval', 5000, int))
         self.readoutTimer.timeout.connect(self.readTimeout)
+        log.info("Temperature Controller initialized")
 
     def setupListener(self, settings):
         """Setup the thread listening for intercom."""
@@ -137,7 +145,7 @@ class TemperatureController(QtCore.QObject):
         self.stopApplication.connect(QtCore.QCoreApplication.instance().quit,
                                      type=connectionType)
         self.stopApplication.emit()
-        print("Stopped.")
+        log.info("Stopped.")
 
     # CONNECTIONS
 
@@ -181,6 +189,10 @@ class TemperatureController(QtCore.QObject):
                 else:
                     if self.pidState[key] == 2:
                         self.setOutput(self.pidOutput[key], output[key])
+                        if self.last_value_set + 60 < time.time():
+                            self.settings.setValue(f"pid{key}/lastOutput",
+                                                   output[key])
+                            pass
                     break  # Valid sensor found: stop loop.
         for key in output.keys():
             data[f'pidOutput{key}'] = output[key]
@@ -222,6 +234,7 @@ class TemperatureController(QtCore.QObject):
             except (psycopg2.OperationalError, psycopg2.InterfaceError):
                 self.connectDatabase()  # Connection lost, reconnect.
             except Exception as exc:
+                log.exception("Database error.", exc_info=exc)
                 self.errors['databaseWrite'] = f"Database error {type(exc).__name__}: {exc}."
                 database.rollback()
             else:

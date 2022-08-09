@@ -9,6 +9,8 @@ InputOutput
 Created on Mon Jun 14 16:25:43 2021 by Benedikt Moneke
 """
 
+import logging
+
 try:
     from controllerData import sensors
 except ModuleNotFoundError:
@@ -34,6 +36,8 @@ else:
                2113: BrickletTemperatureV2,
                }
 
+log = logging.getLogger("TemperatureController")
+
 
 class InputOutput:
     """Definition of input for sensors and output for controlling."""
@@ -48,6 +52,7 @@ class InputOutput:
         except AttributeError:
             pass
         except Exception as exc:
+            log.exception("Input output init failed.", exc_info=exc)
             self.controller.errors['sensorsInit'] = f"{type(exc).__name__}: {exc}"
 
     def setupTinkerforge(self):
@@ -67,7 +72,7 @@ class InputOutput:
         """Store a connected thinkerforge device in the database."""
         if enumeration_type < IPConnection.ENUMERATION_TYPE_DISCONNECTED:
             # Types: AVAILABLE 0, CONNECTED 1, DISCONNECTED 2
-            print(f"Device {'connected' if enumeration_type else 'available'}: {uid} at {position} of type {device_identifier}.")
+            log.info(f"Device {'connected' if enumeration_type else 'available'}: {uid} at {position} of type {device_identifier}.")
             if uid not in self.tfDevices.keys():
                 self.tfDevices[uid] = devices[device_identifier](uid, self.tfCon)
             if device_identifier == BrickHAT.DEVICE_IDENTIFIER:
@@ -81,7 +86,7 @@ class InputOutput:
                 self.tfMap['airQuality'] = uid
         else:
             # Only uid and enumeration_type have valid values.
-            print(f"Device {uid} disconnected.")
+            log.info(f"Device {uid} disconnected.")
             try:
                 del self.tfDevices[uid]
             except KeyError:
@@ -97,11 +102,12 @@ class InputOutput:
         except AttributeError:
             pass  # No sensors file.
         except Exception as exc:
+            log.exception("SensorsClose failed", exc_info=exc)
             self.controller.errors['sensorsClose'] = f"{type(exc).__name__}: {exc}"
         try:  # Deactivate Watchdog.
             self.tfDevices[self.tfMap['HAT']].set_sleep_mode(0, 0, False, False, False)
         except (AttributeError, KeyError):
-            print("No HAT brick found, watchdog is not deactivated.")
+            log.error("No HAT brick found, watchdog is not deactivated.")
         try:
             self.tfCon.disconnect()
         except AttributeError:
@@ -120,6 +126,7 @@ class InputOutput:
         except (AttributeError, AssertionError):
             return {}
         except Exception as exc:
+            log.exception("Get sensors failed.", exc_info=exc)
             self.controller.errors['sensorsGet'] = f"{type(exc).__name__}: {exc}"
             return {}
         else:

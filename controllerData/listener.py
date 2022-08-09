@@ -11,6 +11,7 @@ Handler : connection, signals, controller
 Created on Mon Jun 14 14:05:04 2021 by Benedikt Moneke
 """
 
+import logging
 import pickle
 import socket
 
@@ -24,6 +25,8 @@ except ModuleNotFoundError:
     qtVersion = 5
 
 from devices import intercom
+
+log = logging.getLogger("TemperatureController")
 
 
 class Listener(QtCore.QObject):
@@ -45,7 +48,7 @@ class Listener(QtCore.QObject):
             Instance of the temperature controller.
         """
         super().__init__()
-        self.signals = ListenerSignals()
+        self.signals = self.ListenerSignals()
         self.controller = controller
         assert port >= 0, "No valid port number specified."
         if host is None:  # figure out our IP
@@ -53,7 +56,7 @@ class Listener(QtCore.QObject):
             sock.connect(("8.8.8.8", 80))  # just a reliable server
             host = sock.getsockname()[0]
             sock.close()
-        print(f"Listener initialized at {host}:{port}.")
+        log.info(f"Listener initialized at {host}:{port}.")
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # die Adresse sofort wieder benutzen, nicht den 2 Minuten Timer nach Stop des vorherigen Servers warten
         listener.bind((host, port))
@@ -66,12 +69,20 @@ class Listener(QtCore.QObject):
         else:
             self.threadpool = threadpool
 
+    class ListenerSignals(QtCore.QObject):
+        """Signals for the listener."""
+        stopController = QtCore.pyqtSignal()
+        pidChanged = QtCore.pyqtSignal(str)
+        timerChanged = QtCore.pyqtSignal(str, int)
+        setOutput = QtCore.pyqtSignal(str, float)
+        sensorCommand = QtCore.pyqtSignal(str)
+
     def __del__(self):
         """On deletion close connection."""
         try:
             self.listener.close()
         except Exception as exc:
-            print(f"Closure failed with {exc}.")
+            log.exception("Closure failed with.", exc_info=exc)
 
     def listen(self):
         """Listen for connections and emit it via signals."""
@@ -84,16 +95,7 @@ class Listener(QtCore.QObject):
                 handler = ConnectionHandler(connection, self.signals, self.controller, address)
                 self.threadpool.start(handler)
         self.listener.close()
-        print("Listen stopped to listen.")
-
-
-class ListenerSignals(QtCore.QObject):
-    """Signals for the listener."""
-    stopController = QtCore.pyqtSignal()
-    pidChanged = QtCore.pyqtSignal(str)
-    timerChanged = QtCore.pyqtSignal(str, int)
-    setOutput = QtCore.pyqtSignal(str, float)
-    sensorCommand = QtCore.pyqtSignal(str)
+        log.info("Listen stopped to listen.")
 
 
 class ConnectionHandler(QtCore.QRunnable):
@@ -120,6 +122,7 @@ class ConnectionHandler(QtCore.QRunnable):
             return
         except Exception as exc:
             self.controller.errors['intercom'] = f"Communication error {type(exc).__name__}: {exc}. Address {self.address}."
+            log.error(f"Communication error {type(exc).__name__}: {exc}. Address {self.address}.")
             self.connection.close()
             return
         reaction = {'OFF': self.stopController,
