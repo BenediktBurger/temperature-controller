@@ -35,7 +35,7 @@ class Listener(QtCore.QObject):
     def __init__(self, host=None, port=-1, threadpool=None, controller=None):
         """
         Initialize the Thread.
-        
+
         Parameters
         ----------
         host : str
@@ -148,12 +148,14 @@ class ConnectionHandler(QtCore.QRunnable):
         assert type(data) == dict, "The content has to be a dictionary."
         settings = QtCore.QSettings()
         pidChanged = {}
-        for key in data.keys():
-            settings.setValue(key, data[key])
+        for key, value in data.items():
+            settings.setValue(key, value)
             if key.startswith('pid'):
                 pidChanged[key.split("/")[0]] = True
-            if key == 'readoutInterval':
-                self.signals.timerChanged.emit('readoutTimer', data[key])
+            elif key == 'readoutInterval':
+                self.signals.timerChanged.emit('readoutTimer', value)
+            elif key == 'logLevel':
+                log.setLevel(value)
         for key in pidChanged.keys():
             self.signals.pidChanged.emit(key.replace("pid", ""))
         intercom.sendMessage(self.connection, 'ACK')
