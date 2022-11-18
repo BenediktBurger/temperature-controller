@@ -7,7 +7,10 @@ import logging
 try:
     from PyQt6.QtCore import QSettings
 except ModuleNotFoundError:
-    from PyQt5.QtCore import QSettings
+    try:
+        from PyQt5.QtCore import QSettings
+    except ModuleNotFoundError:
+        QSettings = None
 
 from devices import intercom
 
@@ -20,11 +23,12 @@ class Controller:
     """Connection to the TemperatureController."""
 
     def __init__(self, host=None, port=None):
-        settings = QSettings("NLOQO", "TemperatureControllerPanel")
-        if host is None:
-            host = settings.value('IPaddress', "127.0.0.1", str)
-        if port is None:
-            port = settings.value('port', 22001, int)
+        if QSettings:
+            settings = QSettings("NLOQO", "TemperatureControllerPanel")
+            if host is None:
+                host = settings.value('IPaddress', "127.0.0.1", str)
+            if port is None:
+                port = settings.value('port', 22001, int)
         self.com = intercom.Intercom(host, port)
 
     def sendObject(self, typ, data):
