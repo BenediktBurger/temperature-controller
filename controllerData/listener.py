@@ -82,7 +82,7 @@ class Listener(QtCore.QObject):
         try:
             self.listener.close()
         except Exception as exc:
-            log.exception("Closure failed with.", exc_info=exc)
+            log.exception("Listener closure failed.", exc_info=exc)
 
     def listen(self):
         """Listen for connections and emit it via signals."""
@@ -121,8 +121,7 @@ class ConnectionHandler(QtCore.QRunnable):
             self.connection.close()
             return
         except Exception as exc:
-            self.controller.errors['intercom'] = f"Communication error {type(exc).__name__}: {exc}. Address {self.address}."
-            log.error(f"Communication error {type(exc).__name__}: {exc}. Address {self.address}.")
+            log.exception(f"Communication error, address {self.address}.", exc_info=exc)
             self.connection.close()
             return
         reaction = {'OFF': self.stopController,
@@ -167,8 +166,8 @@ class ConnectionHandler(QtCore.QRunnable):
         settings = QtCore.QSettings()
         data = {}
         for key in keys:
-            if key == 'errors':
-                data[key] = self.controller.errors
+            if key == 'log':
+                data[key] = self.controller.log.log
             elif key == 'data':
                 data[key] = self.controller.data
             else:
@@ -179,8 +178,8 @@ class ConnectionHandler(QtCore.QRunnable):
         """Delete some value."""
         keys = pickle.loads(content)
         assert hasattr(keys, '__iter__'), "The content has to be an iterable."
-        if 'errors' in keys:
-            self.controller.errors = {}
+        if 'log' in keys:
+            self.controller.log.reset()
         intercom.sendMessage(self.connection, 'ACK')
 
     def executeCommand(self, content):

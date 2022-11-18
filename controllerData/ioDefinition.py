@@ -52,8 +52,7 @@ class InputOutput:
         except AttributeError:
             pass
         except Exception as exc:
-            log.exception("Input output init failed.", exc_info=exc)
-            self.controller.errors['sensorsInit'] = f"{type(exc).__name__}: {exc}"
+            log.exception("Input-output init failed.", exc_info=exc)
 
     def setupTinkerforge(self):
         """Create the tinkerforge connection."""
@@ -102,8 +101,7 @@ class InputOutput:
         except AttributeError:
             pass  # No sensors file.
         except Exception as exc:
-            log.exception("SensorsClose failed", exc_info=exc)
-            self.controller.errors['sensorsClose'] = f"{type(exc).__name__}: {exc}"
+            log.exception("Sensors close failed.", exc_info=exc)
         try:  # Deactivate Watchdog.
             self.tfDevices[self.tfMap['HAT']].set_sleep_mode(0, 0, False, False, False)
         except (AttributeError, KeyError):
@@ -127,7 +125,6 @@ class InputOutput:
             return {}
         except Exception as exc:
             log.exception("Get sensors failed.", exc_info=exc)
-            self.controller.errors['sensorsGet'] = f"{type(exc).__name__}: {exc}"
             return {}
         else:
             return data
@@ -138,7 +135,7 @@ class InputOutput:
             try:
                 self.tfDevices[self.tfMap[name]].set_output_voltage(value * 1000)
             except (AttributeError, KeyError):
-                self.controller.errors[name] = "Not connected."
+                log.warning(f"Output '{name}' is not connected.")
             except tfError as exc:
                 if exc.value in (tfError.TIMEOUT, tfError.NOT_CONNECTED):
                     del self.tfDevices[self.tfMap[name]]

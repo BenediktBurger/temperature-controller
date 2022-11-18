@@ -348,25 +348,20 @@ class ControlPanel(QtWidgets.QMainWindow):
 
     @pyqtSlot()
     def getErrors(self):
-        """Show the current errors dictionary as a table."""
+        """Show the current log as a table."""
         try:
-            typ, data = self.sendObject('GET', ['errors'])
-            errors = data['errors']
+            typ, data = self.sendObject('GET', ['log'])
+            errors = data['log']
         except Exception as exc:
             self.showError(exc)
         else:
-            text = ""
-            for key in errors.keys():
-                text += f"{key}:\t{errors[key]}\n"
-            if text == "":
-                text = "None"
-            self.lbReadout.setText(text)
+            self.lbReadout.setText("\n".join(errors))
 
     @pyqtSlot()
     def clearErrors(self):
-        """Clear the remote errors dictionary, afterwards show the errors."""
+        """Clear the remote log, afterwards show the new log."""
         try:
-            typ, data = self.sendObject('DEL', ['errors'])
+            typ, data = self.sendObject('DEL', ['log'])
         except Exception as exc:
             self.showError(exc)
         else:

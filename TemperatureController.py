@@ -28,6 +28,36 @@ from controllerData import listener, ioDefinition
 log = logging.getLogger("TemperatureController")
 log.addHandler(logging.StreamHandler())  # log to stderr
 log.setLevel(logging.INFO)
+# Nothing yet marked as critical
+# critical_handler = logging.FileHandler("log.txt")
+# critical_handler.setLevel(logging.CRITICAL)
+# critical_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+# log.addHandler(critical_handler)
+
+
+class ListHandler(logging.Handler):
+    """Store log entries in a list of strings.
+
+    :param length: Maximum length of entries in the list, rotating buffer system.
+        If None, keep all.
+    """
+
+    def __init__(self, length=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.log = []
+        self.length = length
+
+    def emit(self, record):
+        if self.length is not None and len(self.log) >= self.length:
+            self.log.pop(0)
+        try:
+            self.log.append(self.format(record))
+        except Exception:
+            self.handleError(record)
+
+    def reset(self):
+        """Clear the internal log."""
+        self.log.clear()
 
 
 class TemperatureController(QtCore.QObject):
@@ -47,9 +77,14 @@ class TemperatureController(QtCore.QObject):
         self.settings = settings
 
         # General config
-        self.errors = {}  # Error dictionary.
         self.data = {}  # Current data dictionary.
         self.last_value_set = time.time()
+        self.tries = 0
+
+        # Store log in a list
+        self.log = ListHandler(100)
+        self.log.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        log.addHandler(self.log)
 
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
@@ -78,6 +113,9 @@ class TemperatureController(QtCore.QObject):
         self.readoutTimer.start(settings.value('readoutInterval', 5000, int))
         self.readoutTimer.timeout.connect(self.readTimeout)
         log.info("Temperature Controller initialized")
+
+    def __del__(self):
+        log.removeHandler(self.log)
 
     def setupListener(self, settings):
         """Setup the thread listening for intercom."""
@@ -113,7 +151,7 @@ class TemperatureController(QtCore.QObject):
         self.pidState[name] = settings.value('state', defaultValue=0, type=int)
         sensors = settings.value('sensor', type=str).replace(' ', '').split(',')
         if sensors == ['']:
-            self.errors[f'pid{name}Sensor'] = True
+            log.warning(f"PID '{name}' does not have sensors configured.")
         self.pidSensor[name] = sensors
         self.pidOutput[name] = settings.value('output', f"out{name}", str)
 
@@ -159,7 +197,7 @@ class TemperatureController(QtCore.QObject):
         try:
             self.database = psycopg2.connect(**connectionData.database, connect_timeout=5)
         except Exception as exc:
-            self.errors['database'] = f"Database connection error {type(exc).__name__}: {exc}."
+            log.exception("Database connection error.", exc_info=exc)
 
     # CONFIG
 
@@ -205,23 +243,22 @@ class TemperatureController(QtCore.QObject):
         try:
             self.inputOutput.setOutput(name, value)
         except KeyError:
-            self.errors['outputName'] = f"Output '{name}' is unknown."
+            log.warning(f"Output '{name}' is unknown.")
 
     def writeDatabase(self, data):
         """Write the iterable data in the database with the timestamp."""
         try:  # Check connection to the database and reconnect if necessary.
             database = self.database
         except AttributeError:
-            tries = self.errors.get('databaseNone', -1) + 1
-            if tries < 10:
-                self.errors['databaseNone'] = tries
+            if self.tries < 10:
+                self.tries += 1
             else:
                 self.connectDatabase()
-                del self.errors['databaseNone']
+                self.tries = 0
             return  # No database connection existing.
         table = self.settings.value('database/table', defaultValue="", type=str)
         if table == "":
-            self.errors['databaseTable'] = True
+            log.warning("No database table is configured.")
             return
         columns = "timestamp"
         for key in data.keys():
@@ -234,8 +271,7 @@ class TemperatureController(QtCore.QObject):
             except (psycopg2.OperationalError, psycopg2.InterfaceError):
                 self.connectDatabase()  # Connection lost, reconnect.
             except Exception as exc:
-                log.exception("Database error.", exc_info=exc)
-                self.errors['databaseWrite'] = f"Database error {type(exc).__name__}: {exc}."
+                log.exception("Database write error.", exc_info=exc)
                 database.rollback()
             else:
                 database.commit()

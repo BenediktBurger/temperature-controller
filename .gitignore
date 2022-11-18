@@ -9,5 +9,6 @@ desktop.ini
 
 controllerData/connectionData.py
 controllerData/sensors.py
+log.txt
 
 tests/sensors_test.py
