@@ -24,6 +24,8 @@ from simple_pid import PID
 # local packages
 from controllerData import connectionData    # Data to connect to database.
 from controllerData import listener, ioDefinition
+from devices.intercom import Publisher
+
 
 log = logging.getLogger("TemperatureController")
 log.addHandler(logging.StreamHandler())  # log to stderr
@@ -108,6 +110,7 @@ class TemperatureController(QtCore.QObject):
         self.setupListener(settings)
 
         self.connectDatabase()
+        self.publisher = Publisher(port=11099, standalone=True)
 
         # Configure readoutTimer
         self.readoutTimer.start(settings.value('readoutInterval', 5000, int))
@@ -236,6 +239,7 @@ class TemperatureController(QtCore.QObject):
             data[f'pidOutput{key}'] = output[key]
         self.data = data
         self.writeDatabase(data)
+        self.publisher(data)
 
     @pyqtSlot(str, float)
     def setOutput(self, name, value):

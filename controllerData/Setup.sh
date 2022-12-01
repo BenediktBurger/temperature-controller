@@ -6,7 +6,7 @@
 
 # Install python packages.
 
-sudo apt install python3-psycopg2 python3-pyqt5.qtopengl python3-tz python3-tzlocal libudev1 procps
+sudo apt install python3-psycopg2 python3-pyqt5.qtopengl python3-tz python3-tzlocal python3-zmq libudev1 procps
 
 
 ## For serial communication:

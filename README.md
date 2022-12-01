@@ -11,7 +11,7 @@ Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Or
 
 ### Controller
 
-Zur Installation gibt es ein Shell-Script *Setup.sh*, das die meisten Schritte automatisch ausführt. Es bleiben die lokale Konfiguration (*connectionData.py* und *sensors.py*) und das erste Starten übrig.
+Zur Installation gibt es ein Shell-Script *controllerData/Setup.sh*, das die meisten Schritte automatisch ausführt. Es bleiben die lokale Konfiguration (*connectionData.py* und *sensors.py*) und das erste Starten übrig.
 
 Die einzelnen Schritte sind folgend erklärt.
 

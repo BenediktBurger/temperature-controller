@@ -4,6 +4,7 @@ numpy
 PyQt5
 pytest
 pytest-qt
+pyzmq
 psycopg2
 simple_pid
 tinkerforge

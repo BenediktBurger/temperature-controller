@@ -20,10 +20,12 @@ sendMessage: connection, typ, content=b''
 Created on Thu Mar  4 13:04:32 2021 by Benedikt Moneke
 """
 
-
+import logging
 import pickle
 import socket
 from socket import timeout as timeout
+
+import zmq
 
 
 """
@@ -125,3 +127,74 @@ class Intercom:
             return typ, pickle.loads(content)
         else:
             return typ, content
+
+
+class Publisher:
+    """
+    Publishing key-value data via zmq.
+
+    :param str address: Address of the server, default is localhost.
+    :param int port: Port of the server, defaults to 11100, default proxy.
+    :param log: Logger to log to.
+    :param bool standalone: Use without a proxy server.
+
+    Sending dictionaries of measurement data to Data Collector Programs.
+
+    The key is the first frame (for topic filtering) and the second frame
+    contains the pickled value. Each pair is sent as their own message.
+    Quantities may be expressed as a (magnitude number, units str) tuple.
+    """
+
+    def __init__(self, host="localhost", port=11100, log=None,
+                 standalone=False,
+                 **kwargs):
+        self.log = log or logging.getLogger("__main__.Publisher")
+        self.log.info(f"Publisher started at {host}:{port}.")
+        self.socket = zmq.Context.instance().socket(zmq.PUB)
+        if standalone:
+            self._connecting = self.socket.bind
+            self._disconnecting = self.socket.unbind
+            self.host = "*"
+        else:
+            self._connecting = self.socket.connect
+            self._disconnecting = self.socket.disconnect
+            self.host = host
+        self._port = False
+        self.port = port
+        super().__init__(**kwargs)
+
+    def __del__(self):
+        self.socket.close(1)
+
+    def __call__(self, data):
+        """Publish the dictionary `data`."""
+        self.send(data)
+
+    @property
+    def port(self):
+        """The TCP port to publish to."""
+        return self._port
+
+    @port.setter
+    def port(self, port):
+        self.log.debug(f"Port changed to {port}.")
+        if self._port == port:
+            return
+        if self._port:
+            self._disconnecting(f"tcp://{self.host}:{self._port}")
+        self._connecting(f"tcp://{self.host}:{port}")
+        self._port = port
+
+    def send(self, data):
+        """Send the dictionay `data`."""
+        assert isinstance(data, dict), "Data has to be a dictionary."
+        for key, value in data.items():
+            self.socket.send_multipart((key.encode(), pickle.dumps(value)))
+
+    def send_quantities(self, data):
+        """Send the dictionay `data` containing Quantities."""
+        assert isinstance(data, dict), "Data has to be a dictionary."
+        for key, value in data.items():
+            self.socket.send_multipart((
+                key.encode(),
+                pickle.dumps((value.magnitude, f"{value.units:~}"))))
