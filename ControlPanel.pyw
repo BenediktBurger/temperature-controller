@@ -31,7 +31,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         super().__init__(*args, **kwargs)
 
         # Load the user interface file and show it.
-        uic.loadUi("ControlPanel.ui", self)
+        uic.loadUi("data/ControlPanel.ui", self)
         self.show()
 
         # Get settings.
