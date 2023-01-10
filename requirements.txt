@@ -4,6 +4,8 @@ numpy
 PyQt5
 pytest
 pytest-qt
+pyvisa
+pyvisa-py
 pyzmq
 psycopg2
 simple_pid

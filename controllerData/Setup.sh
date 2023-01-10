@@ -36,6 +36,12 @@ fi
 
 sudo pip3 install -r temperature-controller/requirements.txt
 
+# Copy sample files, if not yet present
+cd ~/temperature-controller/controllerData
+cp temperature-controller.service.template temperature-controller.service
+cp sensors-sample.py sensors.py
+cp connectionData-sample.py connectionData.py
+cd ~
 
 # Autostart configuration.
 mkdir -p ~/.config/systemd/user
