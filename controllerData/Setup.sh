@@ -22,9 +22,6 @@ sudo dpkg -i brickd_linux_latest_armhf.deb
 wget --backups=1 https://download.tinkerforge.com/tools/brickv/linux/brickv_linux_latest.deb
 sudo dpkg -i brickv_linux_latest.deb
 
-sudo pip3 install tinkerforge
-
-
 # Setup git.
 
 cd ~
@@ -36,6 +33,8 @@ else
 	git pull
 	cd ~
 fi
+
+sudo pip3 install -r temperature-controller/requirements.txt
 
 
 # Autostart configuration.
