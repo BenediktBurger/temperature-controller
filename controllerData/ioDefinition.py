@@ -11,9 +11,12 @@ Created on Mon Jun 14 16:25:43 2021 by Benedikt Moneke
 
 import logging
 
+log = logging.getLogger("TemperatureController")
+
 try:
-    from controllerData import sensors
-except ModuleNotFoundError:
+    from . import sensors
+except ModuleNotFoundError as exc:
+    log.exception("Sensors import failed.", exc_info=exc)
     sensors = False
 
 try:  # Tinkerforge for sensors/output
@@ -25,6 +28,7 @@ try:  # Tinkerforge for sensors/output
     from tinkerforge.bricklet_one_wire import BrickletOneWire
     from tinkerforge.bricklet_temperature_v2 import BrickletTemperatureV2
 except ModuleNotFoundError:
+    log.error("Tinkerforge modules not found.")
     tf = False
 else:
     tf = True
@@ -35,8 +39,6 @@ else:
                2123: BrickletOneWire,
                2113: BrickletTemperatureV2,
                }
-
-log = logging.getLogger("TemperatureController")
 
 
 class InputOutput:
@@ -116,6 +118,7 @@ class InputOutput:
         """Request the sensor data and return a dictionary."""
         try:  # Renew the HAT brick watchdog.
             self.tfDevices[self.tfMap['HAT']].set_sleep_mode(30, 1, True, False, True)
+            # Parameters: Go to sleep in s, sleep for s, do sleeping, let bricklets sleep, turn indicator on
         except (AttributeError, KeyError):
             pass
         try:  # Read the sensors.
