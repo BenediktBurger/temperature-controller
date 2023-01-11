@@ -20,7 +20,13 @@ log.addHandler(logging.NullHandler())
 
 
 class Controller:
-    """Connection to the TemperatureController."""
+    """Connection to the TemperatureController.
+
+    If host or port are not specified, the data from the QSettings are taken.
+
+    :param str host: IP address of the host.
+    :param int port: Port number of the host.
+    """
 
     def __init__(self, host=None, port=None):
         if QSettings:
@@ -30,6 +36,16 @@ class Controller:
             if port is None:
                 port = settings.value('port', 22001, int)
         self.com = intercom.Intercom(host, port)
+
+    def set_connection_information(host, port):
+        """Store the connection information in the QSettings.
+
+        :param str host: IP address of the host.
+        :param int port: Port number of the host.
+        """
+        settings = QSettings("NLOQO", "TemperatureControllerPanel")
+        settings.setValue('IPaddress', host)
+        settings.setValue('port', port)
 
     def sendObject(self, typ, data):
         """Send an object and handle the errors."""
@@ -65,8 +81,12 @@ class Controller:
 
     @property
     def log(self):
-        """The log of the controller."""
+        """The log of the controller as a list."""
         return self.sendObject('GET', ['log'])['log']
+
+    def print_log(self):
+        """Print the log entries line by line."""
+        print("\n".join(self.log))
 
     @property
     def sensors(self):
