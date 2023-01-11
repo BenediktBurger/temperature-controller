@@ -4,16 +4,6 @@
 # Setup for the temperature controller
 
 
-# Install python packages.
-
-sudo apt install python3-psycopg2 python3-pyqt5.qtopengl python3-tz python3-tzlocal python3-zmq libudev1 procps
-
-
-## For serial communication:
-
-#sudo pip3 install pyvisa pyvisa-py
-
-
 # Install Tinkerforge brick daemon and brick viewer:
 
 cd ~/Downloads
@@ -24,17 +14,21 @@ sudo dpkg -i brickv_linux_latest.deb
 
 # Setup git.
 
-cd ~
-if [ ! -d temperature-controller ]
+if [ -d ~/temperature-controller ]
 then
-	git clone git@git.rwth-aachen.de:benedikt.moneke/temperature-controller.git
-else
-	cd temperature-controller
+	cd ~/temperature-controller
 	git pull
-	cd ~
+else
+    cd ~
+	git clone git@git.rwth-aachen.de:nloqo/temperature-controller.git
 fi
 
-sudo pip3 install -r temperature-controller/requirements.txt
+# Install python packages.
+
+sudo apt install python3-psycopg2 python3-pyqt5.qtopengl python3-tz python3-tzlocal python3-zmq libudev1 procps
+
+sudo pip3 install -r ~/temperature-controller/requirements.txt
+
 
 # Copy sample files, if not yet present
 cd ~/temperature-controller/controllerData
