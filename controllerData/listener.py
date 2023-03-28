@@ -58,7 +58,8 @@ class Listener(QtCore.QObject):
             sock.close()
         log.info(f"Listener initialized at {host}:{port}.")
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # die Adresse sofort wieder benutzen, nicht den 2 Minuten Timer nach Stop des vorherigen Servers warten
+        # die Adresse sofort wieder benutzen, nicht den 2 Minuten Timer nach Stop des vorherigen Servers warten
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind((host, port))
         listener.settimeout(3)
         listener.listen(1)
@@ -114,7 +115,7 @@ class ConnectionHandler(QtCore.QRunnable):
         try:
             typ, content = intercom.readMessage(self.connection)
         except TypeError as exc:
-            intercom.sendMessage(self.connection, 'ERR', f"TypeError: {exc}".encode('ascii'))
+            intercom.sendMessage(self.connection, 'ERR', f"TypeError: {exc}".encode())
             self.connection.close()
             return
         except (ConnectionResetError, UnicodeDecodeError):
@@ -133,11 +134,11 @@ class ConnectionHandler(QtCore.QRunnable):
         try:
             reaction[typ](content)
         except KeyError:
-            intercom.sendMessage(self.connection, 'ERR', "Unknown command".encode('ascii'))
+            intercom.sendMessage(self.connection, 'ERR', "Unknown command".encode())
         except (TypeError, AssertionError, ValueError) as exc:
-            intercom.sendMessage(self.connection, 'ERR', f"Wrong input content: {exc}".encode('ascii'))
+            intercom.sendMessage(self.connection, 'ERR', f"Wrong input content: {exc}".encode())
         except EOFError:
-            intercom.sendMessage(self.connection, 'ERR', "No message content".encode('ascii'))
+            intercom.sendMessage(self.connection, 'ERR', "No message content".encode())
         finally:
             self.connection.close()
 
@@ -189,7 +190,7 @@ class ConnectionHandler(QtCore.QRunnable):
             try:
                 device = self.controller.pids[deviceName[3]]
             except IndexError:
-                intercom.sendMessage(self.connection, 'ERR', "No pid name given.".encode('ascii'))
+                intercom.sendMessage(self.connection, 'ERR', "No pid name given.".encode())
                 return
             if command == 'components':
                 data = pickle.dumps({f"{deviceName}/components": device.components})
@@ -202,12 +203,12 @@ class ConnectionHandler(QtCore.QRunnable):
             intercom.sendMessage(self.connection, 'ACK')
         elif deviceName.startswith('out'):
             if len(deviceName) < 4:
-                intercom.sendMessage(self.connection, 'ERR', "No output name given.".encode('ascii'))
+                intercom.sendMessage(self.connection, 'ERR', "No output name given.".encode())
                 return
             try:
                 value = float(command)
             except ValueError:
-                intercom.sendMessage(self.connection, 'ERR', "Value is not a number.".encode('ascii'))
+                intercom.sendMessage(self.connection, 'ERR', "Value is not a number.".encode())
             else:
                 self.signals.setOutput.emit(deviceName, value)
                 intercom.sendMessage(self.connection, 'ACK')
@@ -215,7 +216,7 @@ class ConnectionHandler(QtCore.QRunnable):
             try:
                 self.controller.inputOutput.tfCon.enumerate()
             except AttributeError:
-                intercom.sendMessage(self.connection, 'ERR', "No tinkerforge connection.".encode('ascii'))
+                intercom.sendMessage(self.connection, 'ERR', "No tinkerforge connection.".encode())
             else:
                 intercom.sendMessage(self.connection, 'ACK')
 

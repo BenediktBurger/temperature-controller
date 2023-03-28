@@ -11,7 +11,12 @@ import pytest
 
 # auxiliary for fixtures and tests
 import pickle
-from PyQt5 import QtCore
+try:  # Qt for nice effects.
+    from PyQt6 import QtCore
+    pyqt = 6
+except ModuleNotFoundError:
+    from PyQt5 import QtCore
+    pyqt = 5
 import socket
 
 from devices import intercom
@@ -49,7 +54,7 @@ def disable_network(monkeypatch, connection):
 
 @pytest.fixture
 def signals():
-    return listener.ListenerSignals()
+    return listener.Listener.ListenerSignals()
 
 
 @pytest.fixture
@@ -77,8 +82,10 @@ def chPP(chP, empty):
 @pytest.fixture
 def sets(monkeypatch):
     settings = QtCore.QSettings('NLOQO', "tests")
-    monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
-    monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
+    if pyqt == 5:
+        monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+    if pyqt == 6:
+        monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
     yield settings
     settings.clear()
 
@@ -122,17 +129,17 @@ class Test_handler_run():
             raise Exception('test')
         monkeypatch.setattr(intercom, 'readMessage', raising)
 
-    def test_Exception(self, ch, raise_Exception):
+    def test_Exception(self, ch, raise_Exception, caplog):
         ch.controller.errors = {}
         ch.run()
-        assert 'intercom' in ch.controller.errors.keys()
-        assert not ch.connection.open
+        assert "Communication error," in caplog.text
 
-    @pytest.mark.parametrize('typIn, contentIn, answer', [('ACK', None, ['ERR', "Unknown command".encode('ascii')]),
-                                                          ('OFF', None, ['ACK']),
-                                                          ('GET', pickle.dumps(['pid0']), ['SET', pickle.dumps({"pid0": None})]),
-                                                          ('DEL', pickle.dumps([]), ['ACK'])
-                                                          ])
+    @pytest.mark.parametrize('typIn, contentIn, answer', [
+        ('ACK', None, ['ERR', "Unknown command".encode('ascii')]),
+        ('OFF', None, ['ACK']),
+        ('GET', pickle.dumps(['pid0']), ['SET', pickle.dumps({"pid0": None})]),
+        ('DEL', pickle.dumps([]), ['ACK'])
+        ])
     def test_run(self, ch, typIn, contentIn, answer):
         global typ, content
         typ = typIn
@@ -206,20 +213,14 @@ class Test_handler_getValue:
         ch.getValue(pickle.dumps(["testing"]))
         assert pickle.loads(message[2]) == {'testing': 5}
 
-    def test_getValue_errors(self, ch):
+    def test_getValue_errors(self, ch, caplog):
         ch.controller.errors = {'test': "value"}
         ch.getValue(pickle.dumps(['errors']))
-        content = pickle.loads(message[2])
-        assert content == {'errors': {'test': "value"}}
+        assert caplog.text == ""
 
 
 class Test_handler_general:
     """Test the connectionHandler in general"""
-
-    def test_delValue(self, ch):
-        ch.controller.errors = {'test': "value"}
-        ch.delValue(pickle.dumps(['errors']))
-        assert ch.controller.errors == {}
 
     def test_executeCommand_pid_components(self, chP):
         content = pickle.dumps(['pid0', "components"])

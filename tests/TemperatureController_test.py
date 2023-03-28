@@ -12,8 +12,10 @@ import pytest
 # for fixtures
 try:  # Qt for nice effects.
     from PyQt6 import QtCore
+    pyqt = 6
 except ModuleNotFoundError:
     from PyQt5 import QtCore
+    pyqt = 5
 import psycopg2
 from simple_pid import PID
 
@@ -23,7 +25,7 @@ from controllerData import connectionData, listener
 import TemperatureController
 
 
-class Mock_Controller:
+class Mock_Controller(TemperatureController.TemperatureController):
     def __init__(self):
         self.errors = {}
         self.pids = {}
@@ -31,6 +33,28 @@ class Mock_Controller:
         self.pidSensor = {}
         self.pidOutput = {}
         self.test_output = {}
+
+        # General config
+        self.data = {}  # Current data dictionary.
+        self.last_value_set = 0
+        self.tries = 0
+        self.settings = QtCore.QSettings()
+
+        # PID controllers
+        self.pids = {}
+        for i in range(self.settings.value('pids', defaultValue=2, type=int)):
+            self.pids[str(i)] = PID(auto_mode=False)
+            # auto_mode false, in order to start with the last value.
+        self.pidSensor = {}  # the main sensor of the PID
+        self.pidState = {}  # state of the corresponding output: 0 off, 1 manual, 2 pid
+        self.pidOutput = {}  # Output device of the pid.
+        for key in self.pids.keys():
+            self.setupPID(key)
+
+        self.publisher = lambda v: v
+
+    def __del__(self):
+        pass
 
     def setOutput(self, name, value):
         self.test_output[name] = value
@@ -75,7 +99,7 @@ class Mock_Settings:
 
 class Mock_Listener:
     def __init__(self, host=None, port=-1, threadpool=None, controller=None):
-        self.signals = listener.ListenerSignals()
+        self.signals = listener.Listener.ListenerSignals()
 
     def listen(self):
         pass
@@ -185,11 +209,12 @@ class Test_Controller_init:
         yield contr
         contr.stop()
 
-    def test_errors(self, controller):
+    def test_errors(self, controller, caplog):
         assert controller.errors == {'pid0Sensor': True, 'pid1Sensor': True}
 
     def default_pids(self, controller):
         assert controller.pids.keys() == ('0', '1')
+
 
 class Test_connectDatabase:
     def test_connectDatabase_close_existent(self, empty, replace_database, connection):
@@ -203,18 +228,19 @@ class Test_connectDatabase:
         del empty.database['connect_timeout']
         assert empty.database == connectionData.database
 
-    def test_connectDatabase_fail(self, controller, monkeypatch):
+    def test_connectDatabase_fail(self, controller, monkeypatch, caplog):
         def raising(**kwargs):
             raise TypeError('test')
         monkeypatch.setattr('psycopg2.connect', raising)
         TemperatureController.TemperatureController.connectDatabase(controller)
-        assert controller.errors['database'] == "Database connection error TypeError: test."
+        assert "Database connection error TypeError: test." in caplog.text
         assert not hasattr(controller, 'database')
 
 
 class Test_setupPID_defaults:
     @pytest.fixture(autouse=True)
-    def pid(self, controller):
+    def pid(self, controller, caplog):
+        caplog.set_level(0)
         controller.pids['0'] = PID(auto_mode=False)
         return controller.pids['0']
 
@@ -240,8 +266,8 @@ class Test_setupPID_defaults:
     def test_state(self, controller):
         assert controller.pidState['0'] == 0
 
-    def test_sensor_error(self, controller):
-        assert controller.errors['pid0Sensor']
+    def test_sensor_error(self, controller, caplog):
+        assert "PID '0' does not have sensors configured." in caplog.text
 
 
 class Test_setupPID_settings:
@@ -267,8 +293,10 @@ class Test_setupPID_settings:
         settings.setValue('state', 1)
         settings.setValue('sensor', "sensor0, sensor1")
         settings.endGroup()
-        monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
-        monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
+        if pyqt == 5:
+            monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
+        if pyqt == 6:
+            monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
         yield
         settings.clear()
 
@@ -337,20 +365,22 @@ class Test_readoutTimeout:
         TemperatureController.TemperatureController.readTimeout(controller)
         assert controller.test_database['pidOutput0'] == 1
 
-    def test_pid_no_sensors(self, controller, pid):
+    def test_pid_no_sensors(self, controller, pid, caplog):
         controller.pidSensor['0'] = ['missing']
-        assert not hasattr(controller, 'test_database')
+        caplog.set_level(0)
+        TemperatureController.TemperatureController.readTimeout(controller)
+        assert "PID '0' does not have sensors configured." in caplog.text
 
 
 class Test_setOutput:
-    def test_invalid_name(self, controller):
+    def test_invalid_name(self, controller, caplog):
         class Raising_IO:
             def setOutput(self, *args):
                 raise KeyError
         controller.inputOutput = Raising_IO()
         TemperatureController.TemperatureController.setOutput(controller, 'out3', 5)
-        assert 'outputName' in controller.errors.keys()
-    
+        assert "Output 'out3' is unknown." in caplog.text
+
     def test_setOutput(self, mock_io):
         controller = mock_io
         controller.pidState['0'] = True
@@ -365,38 +395,39 @@ class Test_writeDatabase:
         return TemperatureController.TemperatureController.writeDatabase
 
     @pytest.fixture
-    def mock_connect(self, controller):
+    def mock_connect(self, controller, caplog):
+        # TODO fix, as errors does not exist anymore
         def connectDatabase():
             controller.errors['test'] = True
         controller.connectDatabase = connectDatabase
+        assert "PID '0' does not have sensors configured" in caplog.text
 
     def test_no_database(self, writeDatabase, controller):
         writeDatabase(controller, {})
-        assert controller.errors['databaseNone'] == 0
+        assert controller.tries == 0
 
-    def test_no_database_reconnect(self, writeDatabase, controller, mock_connect):
-        controller.errors['databaseNone'] = 9
+    def test_no_database_reconnect(self, writeDatabase, controller, mock_connect, caplog):
+        controller.tries = 9
         writeDatabase(controller, {})
-        assert controller.errors['test']
-        assert 'databaseNone' not in controller.errors
+        assert "no_database" in caplog.text
 
-    def test_no_table(self, controller, mock_settings, monkeypatch, writeDatabase):
+    def test_no_table(self, controller, mock_settings, monkeypatch, writeDatabase, caplog):
         controller.database = 5
         writeDatabase(controller, {})
-        assert 'databaseTable' in controller.errors.keys()
+        assert "No database table" in caplog.text
 
-    def test_write_failure(self, writeDatabase, controller, mock_settings, database):
+    def test_write_failure(self, writeDatabase, controller, mock_settings, database, caplog):
         controller.database = database
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': "fail", '1': "fail"})
         assert controller.database.rollbacked
-        assert 'databaseWrite' in controller.errors.keys()
+        assert "Database write error." in caplog.text
 
-    def test_connection_error(self, controller, writeDatabase, mock_settings, database, mock_connect):
+    def test_connection_error(self, controller, writeDatabase, mock_settings, database, mock_connect, caplog):
         controller.database = database
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': "raise"})
-        assert controller.errors['test']
+        assert "xyz" in caplog.text
 
     @pytest.fixture
     def fill_database(self, writeDatabase, controller, mock_settings, database):

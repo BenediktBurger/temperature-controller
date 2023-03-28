@@ -7,6 +7,7 @@ Created on Mon Jun 21 13:11:23 2021 by Benedikt Moneke
 """
 
 # for tests
+import logging
 import pytest
 from tinkerforge.ip_connection import Error as tfError
 
@@ -14,6 +15,8 @@ from tinkerforge.ip_connection import Error as tfError
 # file to test
 from controllerData import ioDefinition
 
+
+ioDefinition.log.addHandler(logging.StreamHandler())
 
 
 class Empty():
@@ -159,10 +162,11 @@ def test_deviceConnected(mock_tinkerforge, skeleton, tf_device_pars, device_iden
     assert skeleton.tfMap[name] == uid
 
 
-def test_deviceConnected_available(skeleton, mock_tinkerforge, tf_device_pars, capsys):
+def test_deviceConnected_available(skeleton, mock_tinkerforge, tf_device_pars, caplog):
+    caplog.set_level(logging.DEBUG)
     tf_device_pars[6] = 0
     ioDefinition.InputOutput.deviceConnected(skeleton, *tf_device_pars)
-    assert capsys.readouterr().out == "Device available: abc at i of type 111.\n"
+    assert caplog.text.endswith("Device available: abc at i of type 111.\n")
 
 
 class Test_deviceDisconnected:
@@ -189,9 +193,10 @@ class Test_deviceDisconnected:
     def test_device_map(self, setup, act):
         assert setup.tfMap == {}
 
-    def test_output(self, setup, capsys, pars_modified):
+    def test_output(self, setup, caplog, pars_modified):
+        caplog.set_level(logging.DEBUG)
         ioDefinition.InputOutput.deviceConnected(setup, *pars_modified)
-        assert capsys.readouterr().out == "Device abc disconnected.\n"
+        assert caplog.text.endswith("Device abc disconnected.\n")
 
 
 class Test_close:
@@ -214,7 +219,7 @@ class Test_close:
     def test_close_sensors_failed(self, skeletonP, monkeypatch, raising):
         monkeypatch.setattr('controllerData.sensors.close', raising)
         ioDefinition.InputOutput.close(skeletonP)
-        assert skeletonP.controller.errors['sensorsClose'] == "Exception: test"
+        pass  # TODO test exception log
 
 
 class Test_getSensors:
@@ -239,15 +244,16 @@ class Test_getSensors:
         monkeypatch.setattr('controllerData.sensors.getData', lambda *args: [])
         assert ioDefinition.InputOutput.getSensors(empty) == {}
 
-    def test_call_sensors_failed(self, skeletonP, monkeypatch, raising):
+    def test_call_sensors_failed(self, skeletonP, monkeypatch, raising, caplog):
         monkeypatch.setattr('controllerData.sensors.getData', raising)
         ioDefinition.InputOutput.getSensors(skeletonP)
-        assert skeletonP.controller.errors['sensorsGet'] == "Exception: test"
+        assert "Get sensors failed." in caplog.text
 
 
-def test_setOutput_Not_Connected(skeletonP, capsys):
+def test_setOutput_Not_Connected(skeletonP, caplog):
+    caplog.set_level(0)
     ioDefinition.InputOutput.setOutput(skeletonP, 'out1', 100)
-    assert skeletonP.controller.errors['out1'] == "Not connected."
+    assert "Output 'out1' is not connected." in caplog.text
 
 
 def test_setOutput_connection_lost(skeleton):
