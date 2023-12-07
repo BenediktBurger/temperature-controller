@@ -145,7 +145,7 @@ class ConnectionHandler(QtCore.QRunnable):
     def setValue(self, content):
         """Write the content in the settings and emit an appropriate signal."""
         data = pickle.loads(content)
-        assert type(data) == dict, "The content has to be a dictionary."
+        assert isinstance(data, dict), "The content has to be a dictionary."
         settings = QtCore.QSettings()
         pidChanged = {}
         for key, value in data.items():

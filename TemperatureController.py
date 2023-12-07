@@ -5,9 +5,9 @@ Main file of the temperature controller for the lab.
 Created on Mon Jun 14 11:12:51 2021 by Benedikt Moneke
 """
 
+from argparse import ArgumentParser
 import datetime
 import logging
-import sys
 import time
 
 try:  # Qt for nice effects.
@@ -20,6 +20,13 @@ except ModuleNotFoundError:
     qtVersion = 5
 import psycopg2
 from simple_pid import PID
+try:
+    from pyleco.core.message import Message, MessageTypes
+    from pyleco.utils.qt_listener import QtListener
+except ModuleNotFoundError:
+    PYLECO = False
+else:
+    PYLECO = True
 
 # local packages
 from controllerData import connectionData    # Data to connect to database.
@@ -67,14 +74,14 @@ class TemperatureController(QtCore.QObject):
     stopSignal = QtCore.pyqtSignal()
     stopApplication = QtCore.pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, name: str = "TemperatureController", host: str = "localhost", **kwargs):
         """Initialize the controller."""
-        super().__init__()
+        super().__init__(**kwargs)
 
         # Configure Settings
         application = QtCore.QCoreApplication.instance()
         application.setOrganizationName("NLOQO")
-        application.setApplicationName("TemperatureController")
+        application.setApplicationName(name)
         settings = QtCore.QSettings()
         self.settings = settings
 
@@ -108,6 +115,8 @@ class TemperatureController(QtCore.QObject):
 
         # Configure the listener thread for listening intercom.
         self.setupListener(settings)
+        if PYLECO:
+            self.setup_leco_listener(name=name, host=host)
 
         self.connectDatabase()
         self.publisher = Publisher(port=11099, standalone=True)
@@ -120,7 +129,7 @@ class TemperatureController(QtCore.QObject):
     def __del__(self):
         log.removeHandler(self.log)
 
-    def setupListener(self, settings):
+    def setupListener(self, settings: QtCore.QSettings):
         """Setup the thread listening for intercom."""
         self.listenerThread = QtCore.QThread()
         self.stopSignal.connect(self.listenerThread.quit)
@@ -130,14 +139,26 @@ class TemperatureController(QtCore.QObject):
         self.listenerThread.started.connect(self.listener.listen)
         self.listenerThread.start()
         # Listener Signals.
-        self.listener.signals.stopController.connect(self.stop)
+        self.listener.signals.stopController.connect(self.shut_down)
         self.listener.signals.pidChanged.connect(self.setupPID)
         self.listener.signals.timerChanged.connect(self.setTimerInterval)
         self.listener.signals.setOutput.connect(self.setOutput)
         self.listener.signals.sensorCommand.connect(self.sendSensorCommand)
 
+    def setup_leco_listener(self, name: str, host: str):
+        """Set up the Leco listener."""
+        self.leco_listener = QtListener(name=name, host=host)
+        self.leco_listener.start_listen()
+        self.leco_listener.register_rpc_method(self.shut_down)
+        self.leco_listener.register_rpc_method(self.get_current_data)
+        self.leco_listener.register_rpc_method(self.get_log)
+        self.leco_listener.register_rpc_method(self.reset_log)
+        self.leco_listener.register_rpc_method(self.sendSensorCommand)
+        self.leco_listener.register_rpc_method(self.setOutput)
+        self.leco_listener.signals.message.connect(self.handle_message)
+
     @pyqtSlot(str)
-    def setupPID(self, name):
+    def setupPID(self, name) -> None:
         """Configure the pid controller with `name`."""
         pid = self.pids[name]
         settings = QtCore.QSettings()
@@ -159,7 +180,7 @@ class TemperatureController(QtCore.QObject):
         self.pidOutput[name] = settings.value('output', f"out{name}", str)
 
     @pyqtSlot()
-    def stop(self):
+    def shut_down(self):
         """Stop the controller and the application."""
         print("About to stop")
         self.readoutTimer.stop()
@@ -210,14 +231,14 @@ class TemperatureController(QtCore.QObject):
         self.readoutTimer.setInterval(interval)
 
     @pyqtSlot(str)
-    def sendSensorCommand(self, command):
+    def sendSensorCommand(self, command: str):
         """Send a command to the sensors."""
         self.inputOutput.executeCommand(command)
 
     # OPERATION
 
     @pyqtSlot()
-    def readTimeout(self):
+    def readTimeout(self) -> None:
         """Read the sensors and calculate a pid value."""
         data = self.inputOutput.getSensors()
         output = {}
@@ -242,7 +263,7 @@ class TemperatureController(QtCore.QObject):
         self.publisher(data)
 
     @pyqtSlot(str, float)
-    def setOutput(self, name, value):
+    def setOutput(self, name: str, value: float) -> None:
         """Set the output with `name` to `value` if the state allows it."""
         try:
             self.inputOutput.setOutput(name, value)
@@ -280,9 +301,40 @@ class TemperatureController(QtCore.QObject):
             else:
                 database.commit()
 
+    # LECO methods
+    def handle_message(self, message) -> None:
+        if message.header_elements.message_type is not MessageTypes.JSON:
+            log.warning("Unknown message received.")
+            return
+        result = self.leco_listener.message_handler.rpc.process_request(message.payload[0])
+        self.leco_listener.communicator.send(receiver=message.sender,
+                                             conversation_id=message.conversation_id,
+                                             message_type=message.header_elements.message_type,
+                                             data=result
+                                             )
+
+    def get_current_data(self):  # -> dict[str, float]:
+        return self.data
+
+    def get_log(self):  # -> list[str]:
+        return self.log.log
+
+    def reset_log(self):
+        self.log.reset()
+
+
+def main() -> None:
+    parser = ArgumentParser()
+    parser.add_argument("-r", "--host", help="set the host name of this Node's Coordinator")
+    parser.add_argument("-n", "--name", help="set the application name")
+
+    kwargs = vars(parser.parse_args())
+
+    application = QtCore.QCoreApplication([])
+    controller = TemperatureController(**kwargs)  # noqa: F841
+    application.exec()  # start the event loop
+
 
 if __name__ == "__main__":
     """If called as a script, start the qt system and start the controller."""
-    application = QtCore.QCoreApplication(sys.argv)
-    controller = TemperatureController()
-    application.exec()  # start the event loop
+    main()
