@@ -1,0 +1,25 @@
+[project]
+name = "temperature-controller"
+version = "0.0.1.dev"
+authors = [
+  { name="Benedikt Burger" },
+]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+
+[ruff]
+select = ["E", "F", "W"]
+line-length = 100
+exclude = [
+    ".git",
+    ".venv",
+    "__pypackages__",
+    "__pycache__",
+    "build",
+    "dist",
+    "docs/conf.py",
+]
