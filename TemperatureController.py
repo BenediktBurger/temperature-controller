@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 import datetime
 import logging
 import time
+from typing import Dict, List, Optional
 
 try:  # Qt for nice effects.
     from PyQt6 import QtCore
@@ -94,6 +95,7 @@ class TemperatureController(QtCore.QObject):
         self.log = ListHandler(100)
         self.log.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
         log.addHandler(self.log)
+        logging.getLogger("pyleco").addHandler(self.log)
 
         # Create objects like timers
         self.readoutTimer = QtCore.QTimer()
@@ -103,8 +105,8 @@ class TemperatureController(QtCore.QObject):
         self.inputOutput = ioDefinition.InputOutput(controller=self)
 
         # PID controllers
-        self.pids = {}
-        for i in range(self.settings.value('pids', defaultValue=2, type=int)):
+        self.pids: Dict[str, PID] = {}
+        for i in range(settings.value('pids', defaultValue=2, type=int)):
             self.pids[str(i)] = PID(auto_mode=False)
             # auto_mode false, in order to start with the last value.
         self.pidSensor = {}  # the main sensor of the PID
@@ -133,7 +135,7 @@ class TemperatureController(QtCore.QObject):
         """Setup the thread listening for intercom."""
         self.listenerThread = QtCore.QThread()
         self.stopSignal.connect(self.listenerThread.quit)
-        self.listener = listener.Listener(port=settings.value('listener/port', defaultValue=22001, type=int),
+        self.listener = listener.Listener(port=settings.value('listener/port', 22001, int),
                                           threadpool=self.threadpool, controller=self)
         self.listener.moveToThread(self.listenerThread)
         self.listenerThread.started.connect(self.listener.listen)
@@ -148,6 +150,7 @@ class TemperatureController(QtCore.QObject):
     def setup_leco_listener(self, name: str, host: str):
         """Set up the Leco listener."""
         self.leco_listener = QtListener(name=name, host=host)
+        self.leco_listener.signals.message.connect(self.handle_message)
         self.leco_listener.start_listen()
         self.leco_listener.register_rpc_method(self.shut_down)
         self.leco_listener.register_rpc_method(self.get_current_data)
@@ -155,7 +158,46 @@ class TemperatureController(QtCore.QObject):
         self.leco_listener.register_rpc_method(self.reset_log)
         self.leco_listener.register_rpc_method(self.sendSensorCommand)
         self.leco_listener.register_rpc_method(self.setOutput)
-        self.leco_listener.signals.message.connect(self.handle_message)
+        self.leco_listener.register_rpc_method(self.set_PID_settings)
+        self.leco_listener.register_rpc_method(self.set_readout_interval)
+        self.leco_listener.register_rpc_method(self.set_database_table)
+
+    def set_PID_settings(self,
+                         name: str,
+                         lower_limit: None | float = None,
+                         upper_limit: None | float = None,
+                         Kp: None | float = None,
+                         Ki: None | float = None,
+                         Kd: None | float = None,
+                         setpoint: None | float = None,
+                         auto_mode: None | bool = None,
+                         last_output: None | float = None,
+                         state: Optional[int] = None,
+                         sensors: Optional[List[str]] = None,
+                         output_channel: Optional[str] = None,
+                         ) -> None:
+        self._set_pid_settings_from_dict(
+            name=name,
+            lower_limit=lower_limit,
+            upper_limit=upper_limit,
+            Kp=Kp,
+            Ki=Ki,
+            Kd=Kd,
+            setpoint=setpoint,
+            auto_mode=auto_mode,
+            last_output=last_output,
+            state=state,
+            sensors=sensors,
+            output=output_channel,
+        )
+
+    def _set_pid_settings_from_dict(self, name: str, **kwargs):
+        settings = QtCore.QSettings()
+        settings.beginGroup(f'pid{name}')
+        for key, value in kwargs.items():
+            if value is not None:
+                settings.setValue(key, value)
+        self.setupPID(name=name)
 
     @pyqtSlot(str)
     def setupPID(self, name) -> None:
@@ -164,8 +206,10 @@ class TemperatureController(QtCore.QObject):
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{name}')
         pid.output_limits = (
-            None if settings.value('lowerLimitNone', True, bool) else settings.value('lowerLimit', type=float),
-            None if settings.value('upperLimitNone', True, bool) else settings.value('upperLimit', type=float))
+            None if settings.value('lowerLimitNone', True, bool) else settings.value('lowerLimit',
+                                                                                     type=float),
+            None if settings.value('upperLimitNone', True, bool) else settings.value('upperLimit',
+                                                                                     type=float))
         pid.Kp = settings.value('Kp', defaultValue=1, type=float)
         pid.Ki = settings.value('Ki', defaultValue=0, type=float)
         pid.Kd = settings.value('Kd', defaultValue=0, type=float)
@@ -182,7 +226,7 @@ class TemperatureController(QtCore.QObject):
     @pyqtSlot()
     def shut_down(self):
         """Stop the controller and the application."""
-        print("About to stop")
+        log.info("About to stop")
         self.readoutTimer.stop()
         # Stop the listener.
         try:
@@ -302,7 +346,7 @@ class TemperatureController(QtCore.QObject):
                 database.commit()
 
     # LECO methods
-    def handle_message(self, message) -> None:
+    def handle_message(self, message: Message) -> None:
         if message.header_elements.message_type is not MessageTypes.JSON:
             log.warning("Unknown message received.")
             return
@@ -312,6 +356,17 @@ class TemperatureController(QtCore.QObject):
                                              message_type=message.header_elements.message_type,
                                              data=result
                                              )
+
+    def set_database_table(self, table_name: str) -> None:
+        settings = QtCore.QSettings()
+        settings.setValue("database/table", table_name)
+
+    def set_readout_interval(self, interval: float) -> None:
+        """Set the readout interval in seconds (ms resolution)."""
+        settings = QtCore.QSettings()
+        interval_ms = int(interval * 1000)
+        settings.setValue("readoutInterval", interval_ms)
+        self.readoutTimer.setInterval(interval_ms)
 
     def get_current_data(self):  # -> dict[str, float]:
         return self.data
