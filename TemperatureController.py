@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 import datetime
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Any, Optional
 
 try:  # Qt for nice effects.
     from PyQt6 import QtCore
@@ -52,9 +52,9 @@ class ListHandler(logging.Handler):
         If None, keep all.
     """
 
-    def __init__(self, length=None, *args, **kwargs):
+    def __init__(self, length: Optional[int]=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.log = []
+        self.log: list[str] = []
         self.length = length
 
     def emit(self, record):
@@ -76,7 +76,6 @@ class TemperatureController(QtCore.QObject):
     stopApplication = QtCore.pyqtSignal()
 
     def __init__(self, name: str = "TemperatureController", host: str = "localhost", **kwargs):
-        """Initialize the controller."""
         super().__init__(**kwargs)
 
         # Configure Settings
@@ -105,7 +104,7 @@ class TemperatureController(QtCore.QObject):
         self.inputOutput = ioDefinition.InputOutput(controller=self)
 
         # PID controllers
-        self.pids: Dict[str, PID] = {}
+        self.pids: dict[str, PID] = {}
         for i in range(settings.value('pids', defaultValue=2, type=int)):
             self.pids[str(i)] = PID(auto_mode=False)
             # auto_mode false, in order to start with the last value.
@@ -147,7 +146,7 @@ class TemperatureController(QtCore.QObject):
         self.listener.signals.setOutput.connect(self.setOutput)
         self.listener.signals.sensorCommand.connect(self.sendSensorCommand)
 
-    def setup_leco_listener(self, name: str, host: str):
+    def setup_leco_listener(self, name: str, host: str) -> None:
         """Set up the Leco listener."""
         self.leco_listener = QtListener(name=name, host=host)
         self.leco_listener.signals.message.connect(self.handle_message)
@@ -164,16 +163,16 @@ class TemperatureController(QtCore.QObject):
 
     def set_PID_settings(self,
                          name: str,
-                         lower_limit: None | float = None,
-                         upper_limit: None | float = None,
-                         Kp: None | float = None,
-                         Ki: None | float = None,
-                         Kd: None | float = None,
-                         setpoint: None | float = None,
-                         auto_mode: None | bool = None,
-                         last_output: None | float = None,
+                         lower_limit: Optional[float] = None,
+                         upper_limit: Optional[float] = None,
+                         Kp: Optional[float] = None,
+                         Ki: Optional[float] = None,
+                         Kd: Optional[float] = None,
+                         setpoint: Optional[float] = None,
+                         auto_mode: Optional[bool] = None,
+                         last_output: Optional[float] = None,
                          state: Optional[int] = None,
-                         sensors: Optional[List[str]] = None,
+                         sensors: Optional[list[str]] = None,
                          output_channel: Optional[str] = None,
                          ) -> None:
         self._set_pid_settings_from_dict(
@@ -191,7 +190,7 @@ class TemperatureController(QtCore.QObject):
             output=output_channel,
         )
 
-    def _set_pid_settings_from_dict(self, name: str, **kwargs):
+    def _set_pid_settings_from_dict(self, name: str, **kwargs) -> None:
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{name}')
         for key, value in kwargs.items():
@@ -200,7 +199,7 @@ class TemperatureController(QtCore.QObject):
         self.setupPID(name=name)
 
     @pyqtSlot(str)
-    def setupPID(self, name) -> None:
+    def setupPID(self, name: str) -> None:
         """Configure the pid controller with `name`."""
         pid = self.pids[name]
         settings = QtCore.QSettings()
@@ -224,7 +223,7 @@ class TemperatureController(QtCore.QObject):
         self.pidOutput[name] = settings.value('output', f"out{name}", str)
 
     @pyqtSlot()
-    def shut_down(self):
+    def shut_down(self) -> None:
         """Stop the controller and the application."""
         log.info("About to stop")
         self.readoutTimer.stop()
@@ -277,7 +276,7 @@ class TemperatureController(QtCore.QObject):
     @pyqtSlot(str)
     def sendSensorCommand(self, command: str):
         """Send a command to the sensors."""
-        self.inputOutput.executeCommand(command)
+        return self.inputOutput.executeCommand(command)
 
     # OPERATION
 
@@ -314,7 +313,7 @@ class TemperatureController(QtCore.QObject):
         except KeyError:
             log.warning(f"Output '{name}' is unknown.")
 
-    def writeDatabase(self, data):
+    def writeDatabase(self, data: dict[str, float]):
         """Write the iterable data in the database with the timestamp."""
         try:  # Check connection to the database and reconnect if necessary.
             database = self.database
@@ -368,13 +367,14 @@ class TemperatureController(QtCore.QObject):
         settings.setValue("readoutInterval", interval_ms)
         self.readoutTimer.setInterval(interval_ms)
 
-    def get_current_data(self):  # -> dict[str, float]:
+    def get_current_data(self) -> dict[str, float]:
+        """Get current sensor and ouptut data."""
         return self.data
 
-    def get_log(self):  # -> list[str]:
+    def get_log(self) -> list[str]:
         return self.log.log
 
-    def reset_log(self):
+    def reset_log(self) -> None:
         self.log.reset()
 
 

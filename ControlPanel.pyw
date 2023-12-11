@@ -26,12 +26,11 @@ class ControlPanel(QtWidgets.QMainWindow):
     """Define the main window and essential methods of the program."""
 
     def __init__(self, *args, **kwargs):
-        """Initialize the main window and its settings."""
         # Use initialization of parent class QMainWindow.
         super().__init__(*args, **kwargs)
 
         # Load the user interface file and show it.
-        uic.loadUi("data/ControlPanel.ui", self)
+        uic.load_ui.loadUi("data/ControlPanel.ui", self)
         self.show()
 
         # Get settings.
@@ -376,9 +375,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         except Exception as exc:
             self.showError(exc)
         else:
-            text = ""
-            for key in sensors.keys():
-                text += f"{key}:\t{sensors[key]}\n"
+            text = "\n".join([f"{key}:\t{value}" for key, value in sensors.items()])
             if text == "":
                 text = "None"
             self.lbReadout.setText(text)

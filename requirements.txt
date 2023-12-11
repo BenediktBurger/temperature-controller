@@ -1,6 +1,7 @@
 # Required Python packages
 
 numpy
+# pyleco  # not yet published
 PyQt5
 pytest
 pytest-qt
@@ -8,5 +9,6 @@ pyvisa
 pyvisa-py
 pyzmq
 psycopg2
+qtpy
 simple_pid
 tinkerforge
