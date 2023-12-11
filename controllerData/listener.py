@@ -16,13 +16,11 @@ import pickle
 import socket
 
 try:  # Qt for nice effects.
-    from PyQt6 import QtCore
-    from PyQt6.QtCore import pyqtSlot
-    qtVersion = 6
+    from qtpy import QtCore
+    from qtpy.QtCore import Slot as pyqtSlot, Signal as pyqtSignal
 except ModuleNotFoundError:
     from PyQt5 import QtCore
-    from PyQt5.QtCore import pyqtSlot
-    qtVersion = 5
+    from PyQt5.QtCore import pyqtSlot, pyqtSignal
 
 from devices import intercom
 
@@ -72,11 +70,11 @@ class Listener(QtCore.QObject):
 
     class ListenerSignals(QtCore.QObject):
         """Signals for the listener."""
-        stopController = QtCore.pyqtSignal()
-        pidChanged = QtCore.pyqtSignal(str)
-        timerChanged = QtCore.pyqtSignal(str, int)
-        setOutput = QtCore.pyqtSignal(str, float)
-        sensorCommand = QtCore.pyqtSignal(str)
+        stopController = pyqtSignal()
+        pidChanged = pyqtSignal(str)
+        timerChanged = pyqtSignal(str, int)
+        setOutput = pyqtSignal(str, float)
+        sensorCommand = pyqtSignal(str)
 
     def __del__(self):
         """On deletion close connection."""
