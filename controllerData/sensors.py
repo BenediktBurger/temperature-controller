@@ -30,7 +30,10 @@ import math
 from typing import Any
 
 # Necessary for tinkerforge
-from tinkerforge.ip_connection import Error as tfError
+try:
+    from tinkerforge.ip_connection import Error as tfError
+except ModuleNotFoundError:
+    tfError = BaseException
 
 
 # Main methods setup, getData, close.

@@ -9,7 +9,12 @@ Created on Mon Jun 21 13:11:23 2021 by Benedikt Moneke
 # for tests
 import logging
 import pytest
-from tinkerforge.ip_connection import Error as tfError
+try:
+    from tinkerforge.ip_connection import Error as tfError
+except ModuleNotFoundError:
+    tf = False
+else:
+    tf = True
 
 
 # file to test
@@ -80,8 +85,12 @@ class Mock_BrickletAnalogOutV3:
             self.voltage = voltage / 1000  # mV to V
 
 
+@pytest.mark.skipif(tf is False)
 @pytest.fixture
 def mock_tinkerforge(monkeypatch):
+    if tf is False:
+        pytest.skip(reason="Tinkerforge not installed")
+
     def returner(*args):
         return args
 
@@ -99,6 +108,7 @@ def tf_device_pars():
     return ["abc", "def", "i", 0, 0, 111, 1]
 
 
+@pytest.mark.skipif(tf is False)
 @pytest.fixture
 def timeout():
     def timingout():
@@ -276,8 +286,5 @@ class Test_setOutput:
         assert calledArgs == (skeleton, 'out5', 2)
 
     def test_noSensorsFile(self, skeleton, monkeypatch):
-        def raising(*args):
-            raise AttributeError("xy")
-        monkeypatch.setattr('controllerData.sensors.setOutput', raising)
         with pytest.raises(KeyError):
             ioDefinition.InputOutput.setOutput(skeleton, 'out5', 2)

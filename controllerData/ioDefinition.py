@@ -146,6 +146,6 @@ class InputOutput:
     def executeCommand(self, command: str) -> Any:
         """Send `command` to sensors."""
         try:
-            return sensors.executeCommand(self, command: str)
+            return sensors.executeCommand(self, command)
         except NotImplementedError:
             return
