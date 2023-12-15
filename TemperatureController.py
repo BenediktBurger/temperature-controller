@@ -424,6 +424,19 @@ def main() -> None:
 
     kwargs = vars(parser.parse_args())
 
+    # Use stored values.
+    try:
+        address: str = connectionData.leco_coordinator_host_address
+    except AttributeError:
+        pass
+    else:
+        if ":" in address:
+            host, port = address.split(":", maxsplit=1)
+            kwargs.setdefault("port", int(port))
+        else:
+            host = address
+        kwargs.setdefault("host", host)
+
     application = QtCore.QCoreApplication([])
     controller = TemperatureController(**kwargs)  # noqa: F841
     application.exec()  # start the event loop
