@@ -25,6 +25,47 @@ from data import Settings
 class ControlPanel(QtWidgets.QMainWindow):
     """Define the main window and essential methods of the program."""
 
+    # actionClose: QtGui.QAction
+    # actionSettings: QtGui.QAction
+
+    leDatabaseTable: QtWidgets.QLineEdit
+    sbReadoutInterval: QtWidgets.QSpinBox
+    pbGetGeneral: QtWidgets.QPushButton
+    pbSetGeneral: QtWidgets.QPushButton
+    pbShutDown: QtWidgets.QPushButton
+    sbOut0: QtWidgets.QDoubleSpinBox
+    sbOut1: QtWidgets.QDoubleSpinBox
+    pbOut0: QtWidgets.QPushButton
+    pbOut1: QtWidgets.QPushButton
+
+    gbReadout: QtWidgets.QGroupBox
+    pbErrorsGet: QtWidgets.QPushButton
+    pbErrorsClear: QtWidgets.QPushButton
+    pbSensors: QtWidgets.QPushButton
+    lbReadout: QtWidgets.QLabel
+
+    gbPID: QtWidgets.QGroupBox
+    bbId: QtWidgets.QComboBox
+    sbSetpoint: QtWidgets.QDoubleSpinBox
+    sbLastOutput: QtWidgets.QDoubleSpinBox
+    cbAutoMode: QtWidgets.QCheckBox
+    sbLowerLimit: QtWidgets.QDoubleSpinBox
+    cbLowerLimit: QtWidgets.QCheckBox
+    sbUpperLimit: QtWidgets.QDoubleSpinBox
+    cbUpperLimit: QtWidgets.QCheckBox
+    sbKp: QtWidgets.QDoubleSpinBox
+    sbKi: QtWidgets.QDoubleSpinBox
+    sbKd: QtWidgets.QDoubleSpinBox
+    pbGetPID: QtWidgets.QToolButton
+    pbSetPID: QtWidgets.QToolButton
+    leSensor: QtWidgets.QLineEdit
+    bbOutput: QtWidgets.QComboBox
+
+    gbPIDcomponents: QtWidgets.QGroupBox
+    lbComponents: QtWidgets.QLabel
+    pbReset: QtWidgets.QPushButton
+    pbComponents: QtWidgets.QPushButton
+
     def __init__(self, *args, **kwargs):
         # Use initialization of parent class QMainWindow.
         super().__init__(*args, **kwargs)
@@ -35,8 +76,9 @@ class ControlPanel(QtWidgets.QMainWindow):
 
         # Get settings.
         application = QtCore.QCoreApplication.instance()
-        application.setOrganizationName("NLOQO")
-        application.setApplicationName("TemperatureControllerPanel")
+        if application is not None:
+            application.setOrganizationName("NLOQO")
+            application.setApplicationName("TemperatureControllerPanel")
         self.settings = QtCore.QSettings()
 
         # Dictionaries for changed values
@@ -193,8 +235,8 @@ class ControlPanel(QtWidgets.QMainWindow):
                               "itself!"))
         if qtVersion == 6:
             icon = QtWidgets.QMessageBox.Icon.Question
-            buttons = [QtWidgets.QMessageBox.StandardButtons.Yes,
-                       QtWidgets.QMessageBox.StandardButtons.Cancel]
+            buttons = [QtWidgets.QMessageBox.StandardButton.Yes,
+                       QtWidgets.QMessageBox.StandardButton.Cancel]
         else:
             icon = QtWidgets.QMessageBox.Question
             buttons = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
@@ -212,8 +254,8 @@ class ControlPanel(QtWidgets.QMainWindow):
         """Get all the values for the selected PID controller."""
         name = f"pid{self.bbId.currentText()}"
         keys = [f"{name}/setpoint", f"{name}/Kp", f"{name}/Ki", f"{name}/Kd",
-                f"{name}/lowerLimit", f"{name}/lowerLimitNone", f"{name}/upperLimit", f"{name}/upperLimitNone",
-                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state", f"{name}/output"]
+                f"{name}/lowerLimit", f"{name}/lowerLimitNone", f"{name}/upperLimit", f"{name}/upperLimitNone",  # noqa: E501
+                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state", f"{name}/output"]  # noqa: E501
         try:
             typ, data = self.sendObject('GET', keys)
         except Exception as exc:
@@ -224,11 +266,11 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
             self.sbKd.setValue(self.gotToFloat(data[keys[3]]))
             self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
-            self.cbLowerLimit.setChecked(False if data[keys[5]] in (False, "0", "false", "False") else True)
+            self.cbLowerLimit.setChecked(False if data[keys[5]] in (False, "0", "false", "False") else True)  # noqa: E501
             self.sbUpperLimit.setValue(self.gotToFloat(data[keys[6]]))
-            self.cbUpperLimit.setChecked(False if data[keys[7]] in (False, "0", "false", "False") else True)
+            self.cbUpperLimit.setChecked(False if data[keys[7]] in (False, "0", "false", "False") else True)  # noqa: E501
             self.leSensor.setText(data[keys[8]])
-            self.cbAutoMode.setChecked(False if data[keys[9]] in (False, "0", "false", "False") else True)
+            self.cbAutoMode.setChecked(False if data[keys[9]] in (False, "0", "false", "False") else True)  # noqa: E501
             self.sbLastOutput.setValue(self.gotToFloat(data[keys[10]]))
             self.bbOutput.setCurrentIndex(int(self.gotToFloat(data[keys[11]])))
             self.changedPID.clear()  # Reset changed dictionary.

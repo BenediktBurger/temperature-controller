@@ -1,13 +1,14 @@
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from pyleco.directors.director import Director
 
 
 class ControllerDirector(Director):
+    """Direct a temperature controller."""
 
     def get_current_data(self) -> dict[str, float]:
-        """Get current sensor and ouptut data."""
+        """Get current sensor and output data."""
         return self.ask_rpc("get_current_data")
 
     def get_log(self) -> list[str]:
@@ -25,14 +26,14 @@ class ControllerDirector(Director):
 
     def set_PID_settings(self,
                          name: str,
-                         lower_limit: None | float = None,
-                         upper_limit: None | float = None,
-                         Kp: None | float = None,
-                         Ki: None | float = None,
-                         Kd: None | float = None,
-                         setpoint: None | float = None,
-                         auto_mode: None | bool = None,
-                         last_output: None | float = None,
+                         lower_limit: Optional[float] = None,
+                         upper_limit: Optional[float] = None,
+                         Kp: Optional[float] = None,
+                         Ki: Optional[float] = None,
+                         Kd: Optional[float] = None,
+                         setpoint: Optional[float] = None,
+                         auto_mode: Optional[bool] = None,
+                         last_output: Optional[float] = None,
                          state: Optional[int] = None,
                          sensors: Optional[List[str]] = None,
                          output_channel: Optional[str] = None,
@@ -53,17 +54,29 @@ class ControllerDirector(Director):
             output=output_channel,
         )
 
-    def get_PID_settings(self, pid: int | str = 0) -> dict[str, Any]:
+    def get_PID_settings(self, pid: Union[int, str] = 0) -> dict[str, Any]:
         return self.ask_rpc("get_PID_settings", pid=pid)
 
-    def reset_PID(self, pid: int | str = 0) -> None:
+    def reset_PID(self, pid: Union[int, str] = 0) -> None:
         self.ask_rpc("reset_PID", pid=pid)
 
-    def get_current_PID_state(self, pid: int | str = 0) -> tuple[float, float, float]:
+    def get_current_PID_state(self, pid: Union[int, str] = 0) -> tuple[float, float, float]:
         return self.ask_rpc("get_current_PID_state", pid=pid)
 
     def set_readout_interval(self, interval: float) -> None:
         self.ask_rpc("set_readout_interval", interval=interval)
 
+    def get_readout_interval(self) -> float:
+        return self.ask_rpc("get_readout_interval")
+
     def set_database_table(self, table_name: str) -> None:
         self.ask_rpc("set_database_table", table_name=table_name)
+
+    def get_database_table(self) -> str:
+        return self.ask_rpc("get_database_table")
+
+    def shut_down_actor(self, actor: Union[bytes, str, None] = None) -> None:
+        try:
+            return super().shut_down_actor(actor)
+        except TimeoutError:
+            print("Timeout during shutting down actor.")

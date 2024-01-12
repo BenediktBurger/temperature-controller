@@ -9,15 +9,8 @@ created on 23.11.2020 by Benedikt Moneke
 from argparse import ArgumentParser
 from typing import Any, Dict
 
-try:
-    from PyQt6 import QtCore, QtWidgets, uic
-    from PyQt6.QtCore import pyqtSlot
-    qtVersion = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore, QtWidgets, uic
-    from PyQt5.QtCore import pyqtSlot
-    qtVersion = 5
-
+from qtpy import QtCore, QtWidgets, uic
+from qtpy.QtCore import Slot as pyqtSlot  # type: ignore
 
 # Local packages.
 from data import Settings
@@ -27,6 +20,47 @@ from data.controller_director import ControllerDirector
 class ControlPanel(QtWidgets.QMainWindow):
     """Define the main window and essential methods of the program."""
 
+    # actionClose: QtGui.QAction
+    # actionSettings: QtGui.QAction
+
+    leDatabaseTable: QtWidgets.QLineEdit
+    sbReadoutInterval: QtWidgets.QSpinBox
+    pbGetGeneral: QtWidgets.QPushButton
+    pbSetGeneral: QtWidgets.QPushButton
+    pbShutDown: QtWidgets.QPushButton
+    sbOut0: QtWidgets.QDoubleSpinBox
+    sbOut1: QtWidgets.QDoubleSpinBox
+    pbOut0: QtWidgets.QPushButton
+    pbOut1: QtWidgets.QPushButton
+
+    gbReadout: QtWidgets.QGroupBox
+    pbErrorsGet: QtWidgets.QPushButton
+    pbErrorsClear: QtWidgets.QPushButton
+    pbSensors: QtWidgets.QPushButton
+    lbReadout: QtWidgets.QLabel
+
+    gbPID: QtWidgets.QGroupBox
+    bbId: QtWidgets.QComboBox
+    sbSetpoint: QtWidgets.QDoubleSpinBox
+    sbLastOutput: QtWidgets.QDoubleSpinBox
+    cbAutoMode: QtWidgets.QCheckBox
+    sbLowerLimit: QtWidgets.QDoubleSpinBox
+    cbLowerLimit: QtWidgets.QCheckBox
+    sbUpperLimit: QtWidgets.QDoubleSpinBox
+    cbUpperLimit: QtWidgets.QCheckBox
+    sbKp: QtWidgets.QDoubleSpinBox
+    sbKi: QtWidgets.QDoubleSpinBox
+    sbKd: QtWidgets.QDoubleSpinBox
+    pbGetPID: QtWidgets.QToolButton
+    pbSetPID: QtWidgets.QToolButton
+    leSensor: QtWidgets.QLineEdit
+    bbOutput: QtWidgets.QComboBox
+
+    gbPIDcomponents: QtWidgets.QGroupBox
+    lbComponents: QtWidgets.QLabel
+    pbReset: QtWidgets.QPushButton
+    pbComponents: QtWidgets.QPushButton
+
     def __init__(self, name="TemperatureControllerPanel", actor="TemperatureController",
                  host="localhost",
                  **kwargs):
@@ -34,13 +68,14 @@ class ControlPanel(QtWidgets.QMainWindow):
         super().__init__(**kwargs)
 
         # Load the user interface file and show it.
-        uic.load_ui.loadUi("data/ControlPanel.ui", self)
+        uic.loadUi("data/ControlPanel.ui", self)
         self.show()
 
         # Get settings.
         application = QtCore.QCoreApplication.instance()
-        application.setOrganizationName("NLOQO")
-        application.setApplicationName(name)
+        if application is not None:
+            application.setOrganizationName("NLOQO")
+            application.setApplicationName(name)
         self.settings = QtCore.QSettings()
 
         # Dictionaries for changed values
@@ -106,10 +141,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def showError(self, exc=None):
         """Show an error message."""
         message = QtWidgets.QMessageBox()
-        if qtVersion == 6:
-            icon = QtWidgets.QMessageBox.Icon.Warning
-        else:
-            icon = QtWidgets.QMessageBox.Warning
+        icon = QtWidgets.QMessageBox.Icon.Warning
         message.setIcon(icon)
         message.setWindowTitle("Communication error")
         message.setText(("A communication error occurred, please check the "
@@ -123,15 +155,15 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot()
     def getGeneral(self):
         """Get the general settings."""
-        raise NotImplementedError
         try:
-            typ, data = self.sendObject('GET', keys)
+            table = self.director.get_database_table()
+            interval = self.director.get_readout_interval()
         except Exception as exc:
             self.showError(exc)
         else:
-            self.leDatabaseTable.setText(data['database/table'])
+            self.leDatabaseTable.setText(table)
             self.sbReadoutInterval.setValue(
-                5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
+                5000 if interval is None else int(interval * 1000))
 
     @pyqtSlot()
     def setGeneral(self):
@@ -173,16 +205,11 @@ class ControlPanel(QtWidgets.QMainWindow):
                               "controller? You can not start it with this "
                               "program, but have to do it on the computer "
                               "itself!"))
-        if qtVersion == 6:
-            icon = QtWidgets.QMessageBox.Icon.Question
-            buttons = [QtWidgets.QMessageBox.StandardButtons.Yes,
-                       QtWidgets.QMessageBox.StandardButtons.Cancel]
-        else:
-            icon = QtWidgets.QMessageBox.Question
-            buttons = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
+        icon = QtWidgets.QMessageBox.Icon.Question
+        buttons = QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.Cancel  # noqa
         confirmation.setIcon(icon)
-        confirmation.setStandardButtons(buttons[0] | buttons[1])
-        if confirmation.exec() == buttons[0]:
+        confirmation.setStandardButtons(buttons)
+        if confirmation.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
             self.director.shut_down_actor()
 
     # PID values
@@ -193,7 +220,9 @@ class ControlPanel(QtWidgets.QMainWindow):
             data = self.director.get_PID_settings(self.bbId.currentText())
         except Exception as exc:
             self.showError(exc)
-        else:
+            return
+        try:
+            print(data)
             self.sbSetpoint.setValue(data["setpoint"])
             self.sbKp.setValue(data["Kp"])
             self.sbKi.setValue(data["Ki"])
@@ -205,8 +234,11 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.leSensor.setText(", ".join(data["sensors"]))
             self.cbAutoMode.setChecked(data["autoMode"])
             self.sbLastOutput.setValue(data["lastOutput"])
-            self.bbOutput.setCurrentIndex(data["output"])
+            self.bbOutput.setCurrentIndex(data["state"])
             self.changedPID.clear()  # Reset changed dictionary.
+        except Exception as exc:
+            print(data)
+            self.showError(exc)
 
     def gotToFloat(self, received):
         """Turn a received number into a float."""
@@ -218,6 +250,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def setPID(self):
         """Set the changed values."""
         if self.changedPID:
+            print("new values", self.changedPID)  # HACK
             pid_dicts = {}
             for key, value in self.changedPID.items():
                 name, par = key.split("/")
@@ -227,7 +260,10 @@ class ControlPanel(QtWidgets.QMainWindow):
                 except KeyError:
                     pid_dicts[name] = {par: value}
             for name, config in pid_dicts.items():
-                self.director.set_PID_settings(name=name, **config)
+                try:
+                    self.director.set_PID_settings(name=name, **config)
+                except TypeError as exc:
+                    self.showError(exc)
 
     @pyqtSlot(str)
     def selectPID(self, name):
@@ -259,45 +295,49 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot(float)
     def changedUpperLimit(self, value):
         """Store the upper Limit in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = value
+        if not self.cbUpperLimit.isChecked():
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = value
 
     @pyqtSlot(int)
     def changedUpperLimitNone(self, checked):
         """Store the None value of upper limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = True
+            # self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = True
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = float("inf")
         else:
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = False
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = self.sbUpperLimit.value()
+            # self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = False
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = self.sbUpperLimit.value()
 
     @pyqtSlot(float)
     def changedLowerLimit(self, value):
         """Store the lower Limit in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = value
+        if not self.cbLowerLimit.isChecked():
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = value
 
     @pyqtSlot(int)
     def changedLowerLimitNone(self, checked):
         """Store the None value of lower limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = True
+            # self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = True
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = float("-inf")
         else:
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = False
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = self.sbLowerLimit.value()
+            # self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = False
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = self.sbLowerLimit.value()
 
     @pyqtSlot()
     def changedSensor(self):
         """Store the Sensor in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/sensor'] = self.leSensor.text()
+        self.changedPID[f'pid{self.bbId.currentText()}/sensors'] = self.leSensor.text().replace(",", " ").split()  # noqa
 
     @pyqtSlot(int)
     def changedAutoMode(self, value):
         """Store the auto mode in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/autoMode'] = value
+        self.changedPID[f'pid{self.bbId.currentText()}/auto_mode'] = value
 
     @pyqtSlot(float)
     def changedLastOutput(self, value):
         """Store the last output in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/lastOutput'] = value
+        self.changedPID[f'pid{self.bbId.currentText()}/last_output'] = value
 
     @pyqtSlot(int)
     def changedState(self, value):
@@ -319,7 +359,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def resetPID(self):
         """Send a command to reset the PID values of the current controller."""
         try:
-            self.director.reset_PID(self.bbId.currentText)
+            self.director.reset_PID(self.bbId.currentText())
         except Exception as exc:
             self.showError(exc)
 
@@ -363,8 +403,12 @@ def main() -> None:
     parser.add_argument("-n", "--name", help="set the application name")
 
     kwargs = vars(parser.parse_args())
+    for key, value in list(kwargs.items()):
+        # remove not set values
+        if value is None:
+            del kwargs[key]
 
-    application = QtCore.QCoreApplication([])
+    application = QtWidgets.QApplication([])
     panel = ControlPanel(**kwargs)  # noqa: F841
     application.exec()  # start the event loop
 

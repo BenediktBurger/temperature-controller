@@ -8,18 +8,13 @@ Created on Mon Jun 14 11:12:51 2021 by Benedikt Moneke
 from argparse import ArgumentParser
 import datetime
 import logging
+import math
 import time
 from typing import Any, Optional
 
-try:  # Qt for nice effects.
-    from PyQt6 import QtCore
-    from PyQt6.QtCore import pyqtSlot
-    qtVersion = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore
-    from PyQt5.QtCore import pyqtSlot
-    qtVersion = 5
-import psycopg2
+
+from qtpy import QtCore
+from qtpy.QtCore import Slot as pyqtSlot  # type: ignore
 from simple_pid import PID
 try:
     from pyleco.core.message import Message, MessageTypes
@@ -43,6 +38,12 @@ log.setLevel(logging.INFO)
 # critical_handler.setLevel(logging.CRITICAL)
 # critical_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 # log.addHandler(critical_handler)
+
+try:
+    import psycopg2
+except ModuleNotFoundError:
+    psycopg2 = None
+    log.warning("Package 'psycopg2' not found, no database access possible.")
 
 
 class ListHandler(logging.Handler):
@@ -80,8 +81,9 @@ class TemperatureController(QtCore.QObject):
 
         # Configure Settings
         application = QtCore.QCoreApplication.instance()
-        application.setOrganizationName("NLOQO")
-        application.setApplicationName(name)
+        if application is not None:
+            application.setOrganizationName("NLOQO")
+            application.setApplicationName(name)
         settings = QtCore.QSettings()
         self.settings = settings
 
@@ -117,6 +119,7 @@ class TemperatureController(QtCore.QObject):
         # Configure the listener thread for listening intercom.
         self.setupListener(settings)
         if PYLECO:
+            print("temp name", name)
             self.setup_leco_listener(name=name, host=host)
 
         self.connectDatabase()
@@ -161,7 +164,9 @@ class TemperatureController(QtCore.QObject):
         self.leco_listener.register_rpc_method(self.get_PID_settings)
         self.leco_listener.register_rpc_method(self.reset_PID)
         self.leco_listener.register_rpc_method(self.get_current_PID_state)
+        self.leco_listener.register_rpc_method(self.get_readout_interval)
         self.leco_listener.register_rpc_method(self.set_readout_interval)
+        self.leco_listener.register_rpc_method(self.get_database_table)
         self.leco_listener.register_rpc_method(self.set_database_table)
 
     def set_PID_settings(self,
@@ -180,14 +185,14 @@ class TemperatureController(QtCore.QObject):
                          ) -> None:
         self._set_pid_settings_from_dict(
             name=name,
-            lower_limit=lower_limit,
-            upper_limit=upper_limit,
+            lowerLimit=lower_limit,
+            upperLimit=upper_limit,
             Kp=Kp,
             Ki=Ki,
             Kd=Kd,
             setpoint=setpoint,
-            auto_mode=auto_mode,
-            last_output=last_output,
+            autoMode=auto_mode,
+            lastOutput=last_output,
             state=state,
             sensors=sensors,
             output=output_channel,
@@ -197,8 +202,13 @@ class TemperatureController(QtCore.QObject):
         settings = QtCore.QSettings()
         settings.beginGroup(f'pid{name}')
         for key, value in kwargs.items():
-            if value is not None:
-                settings.setValue(key, value)
+            if value is None:
+                continue
+            if key == "lowerLimit":
+                settings.setValue("lowerLimitNone", math.isinf(value))
+            elif key == "upperLimit":
+                settings.setValue("upperLimitNone", math.isinf(value))
+            settings.setValue(key, value)
         settings.setValue("sensor", ",".join(settings.value("sensors")))
         self.setupPID(name=name)
 
@@ -241,6 +251,7 @@ class TemperatureController(QtCore.QObject):
             'setpoint': (22.2, float),
             "sensor": ("", str),
             "output": ("", str),
+            "state": (0, int),
         }
         config = {}
         settings = QtCore.QSettings()
@@ -272,13 +283,10 @@ class TemperatureController(QtCore.QObject):
             pass  # No database connection.
 
         # Stop the Application.
-        if qtVersion == 6:
-            connectionType = QtCore.Qt.ConnectionType.QueuedConnection
-        else:
-            connectionType = QtCore.Qt.QueuedConnection
-        self.stopApplication.connect(QtCore.QCoreApplication.instance().quit,
-                                     type=connectionType)
-        self.stopApplication.emit()
+        app = QtCore.QCoreApplication.instance()
+        if app is not None:
+            self.stopApplication.connect(app.quit)
+            self.stopApplication.emit()
         log.info("Stopped.")
 
     # CONNECTIONS
@@ -290,8 +298,12 @@ class TemperatureController(QtCore.QObject):
             del self.database
         except AttributeError:
             pass  # no database present
+        if psycopg2 is None:
+            return
         try:
             self.database = psycopg2.connect(**connectionData.database, connect_timeout=5)
+        except AttributeError:
+            pass
         except Exception as exc:
             log.exception("Database connection error.", exc_info=exc)
 
@@ -375,8 +387,8 @@ class TemperatureController(QtCore.QObject):
 
     # LECO methods
     def handle_message(self, message: Message) -> None:
-        if message.header_elements.message_type is not MessageTypes.JSON:
-            log.warning("Unknown message received.")
+        if message.header_elements.message_type != MessageTypes.JSON:
+            log.warning(f"Unknown message received {message}.")
             return
         result = self.leco_listener.message_handler.rpc.process_request(message.payload[0])
         self.leco_listener.communicator.send(receiver=message.sender,
@@ -389,6 +401,9 @@ class TemperatureController(QtCore.QObject):
         settings = QtCore.QSettings()
         settings.setValue("database/table", table_name)
 
+    def get_database_table(self) -> str:
+        return QtCore.QSettings().value("database/table", type=str)
+
     def set_readout_interval(self, interval: float) -> None:
         """Set the readout interval in seconds (ms resolution)."""
         settings = QtCore.QSettings()
@@ -396,8 +411,11 @@ class TemperatureController(QtCore.QObject):
         settings.setValue("readoutInterval", interval_ms)
         self.readoutTimer.setInterval(interval_ms)
 
+    def get_readout_interval(self) -> float:
+        return QtCore.QSettings().value("readoutInterval", type=int) / 1000
+
     def get_current_data(self) -> dict[str, float]:
-        """Get current sensor and ouptut data."""
+        """Get current sensor and output data."""
         return self.data
 
     def reset_PID(self, pid: int | str = 0) -> None:
@@ -421,8 +439,17 @@ def main() -> None:
     parser = ArgumentParser()
     parser.add_argument("-r", "--host", help="set the host name of this Node's Coordinator")
     parser.add_argument("-n", "--name", help="set the application name")
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="increase the logging level by one, may be used more than once")
 
     kwargs = vars(parser.parse_args())
+    for key, value in list(kwargs.items()):
+        # remove not set values
+        if value is None:
+            del kwargs[key]
+    verbosity = kwargs.pop("verbose")
+    if verbosity:
+        logging.getLogger("pyleco").addHandler(logging.StreamHandler())
 
     # Use stored values.
     try:
