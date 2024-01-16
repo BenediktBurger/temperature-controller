@@ -10,19 +10,33 @@ import datetime
 import logging
 import math
 import time
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 
 from qtpy import QtCore
 from qtpy.QtCore import Slot as pyqtSlot  # type: ignore
 from simple_pid import PID
-try:
-    from pyleco.core.message import Message, MessageTypes
-    from pyleco.utils.qt_listener import QtListener
-except ModuleNotFoundError:
-    PYLECO = False
-else:
-    PYLECO = True
+PYLECO = False
+for i in range(3):
+    try:
+        from pyleco.core.message import Message, MessageTypes
+        from pyleco.utils.qt_listener import QtListener
+    except ModuleNotFoundError:
+        break
+    except Exception:
+        """
+        Quite often on Python 3.9 on Raspberry Pi (at least one), an error is raised at the first
+        try to import pyleco:
+
+        `configparser.MissingSectionHeaderError: File contains no section headers.`
+
+        At second try it works, therefore a few more tries are added.
+        """
+        pass
+    else:
+        print(f"Loading LECO on try {i}")
+        PYLECO = True
+        break
 
 # local packages
 from controllerData import connectionData    # Data to connect to database.
@@ -236,7 +250,7 @@ class TemperatureController(QtCore.QObject):
         self.pidSensor[name] = sensors
         self.pidOutput[name] = settings.value('output', f"out{name}", str)
 
-    def get_PID_settings(self, pid: str | int) -> dict[str, Any]:
+    def get_PID_settings(self, pid: Union[str, int]) -> dict[str, Any]:
         PID_settings = {
             # key: (defaultValue, type)
             'lowerLimitNone': (True, bool),
@@ -418,12 +432,12 @@ class TemperatureController(QtCore.QObject):
         """Get current sensor and output data."""
         return self.data
 
-    def reset_PID(self, pid: int | str = 0) -> None:
+    def reset_PID(self, pid: Union[int, str] = 0) -> None:
         if isinstance(pid, int):
             pid = str(pid)
         self.pids[pid].reset()
 
-    def get_current_PID_state(self, pid: int | str = 0) -> tuple[float, float, float]:
+    def get_current_PID_state(self, pid: Union[int, str] = 0) -> tuple[float, float, float]:
         if isinstance(pid, int):
             pid = str(pid)
         return self.pids[pid].components
