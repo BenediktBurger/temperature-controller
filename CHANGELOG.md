@@ -12,6 +12,10 @@ _For upgrading, install *qtpy* first._
 ### Added
 
 - Add LECO (Laboratory Experiment Control prOtocol) functionality (optionally as it is not available on pypi yet).
+- Add logging.
+- Store the last output value (#6, #7).
+- Add installation script controllerData/Setup.sh ([`c1a39734b`](https://git.rwth-aachen.de/nloqo/temperature-controller/-/commit/c1a39734b299add346c1fd684eddbdc319faddf9), [`3cf7c4512`](https://git.rwth-aachen.de/nloqo/temperature-controller/-/commit/3cf7c4512024f4029be5b1e14806e42d77bbc449)).
+- Add possibility to read the last sensor value.
 
 
 ## [1.1.0] - 2021-07-21
