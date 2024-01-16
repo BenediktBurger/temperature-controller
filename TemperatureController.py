@@ -14,7 +14,7 @@ from typing import Any, Optional, Union
 
 
 from qtpy import QtCore
-from qtpy.QtCore import Slot as pyqtSlot  # type: ignore
+from qtpy.QtCore import Slot as pyqtSlot, Signal as pyqtSignal  # type: ignore
 from simple_pid import PID
 PYLECO = False
 for i in range(3):
@@ -87,8 +87,8 @@ class ListHandler(logging.Handler):
 
 class TemperatureController(QtCore.QObject):
     """The temperature controller itself."""
-    stopSignal = QtCore.pyqtSignal()
-    stopApplication = QtCore.pyqtSignal()
+    stopSignal = pyqtSignal()
+    stopApplication = pyqtSignal()
 
     def __init__(self, name: str = "TemperatureController", host: str = "localhost", **kwargs):
         super().__init__(**kwargs)
