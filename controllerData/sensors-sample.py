@@ -26,17 +26,20 @@ All the other methods here are examples for routines outsourced from above
 necessary or optional methods.
 """
 
-# Necessary for tinkerforge
-from tinkerforge.ip_connection import Error as tfError
+import math
+from typing import Any
 
-# Only necessary for other sensors in this example: Arduino and wde.
-import numpy as np
-import pyvisa
+# Necessary for tinkerforge
+try:
+    from tinkerforge.ip_connection import Error as tfError
+except ModuleNotFoundError:
+    tfError = BaseException
 
 
 # Main methods setup, getData, close.
-def setup(self):
+def setup(self) -> None:
     """Configure the sensors."""
+    raise NotImplementedError
     self.rm = pyvisa.ResourceManager()
     try:
         self.south = setupArduino(self.rm, "/dev/ArduinoSouth")
@@ -52,8 +55,9 @@ def setup(self):
         pass  # Setup failed, so no device stored.
 
 
-def getData(self):
+def getData(self) -> dict[str, float]:
     """Read the sensors and return a dictionary."""
+    raise NotImplementedError
     data = {}  # Empty dictionary.
     data.update(getAirQuality(self))
     data.update(getArduinoData(self.south))  # Combine with another dictionary.
@@ -77,18 +81,21 @@ def getData(self):
     # airQuality.get_air_pressure() / 100  # in hPa
 
 
-def setOutput(self, output, value):
+def setOutput(self, output: str, value: float) -> None:
     """Set the additional `output` to `value`."""
+    raise NotImplementedError
     print(f"{output} has now value {value}.")
 
 
-def executeCommand(self, command):
+def executeCommand(self, command: str) -> Any:
     """Execute `command`, sending it to the arduino."""
-    self.south.query(command)
+    raise NotImplementedError
+    return self.south.query(command)
 
 
-def close(self):
+def close(self) -> None:
     """Close the connections."""
+    raise NotImplementedError
     try:
         self.south.close()
     except AttributeError:
@@ -182,7 +189,10 @@ def calculateTemperature(voltage):
         pars = [3.354017, 2.5617244, 2.1400943, -7.2405219]
     else:
         pars = [3.3536166, 2.53772, 0.85433271, -8.7912262]
-    return 1 / (pars[0] * 1E-3 + pars[1] * 1E-4 * np.log(voltage) + pars[2] * 1E-6 * (np.log(voltage))**2 + pars[3] * 1E-8 * (np.log(voltage))**3) - 273.15
+    return 1 / (pars[0] * 1E-3
+                + pars[1] * 1E-4 * math.log(voltage)
+                + pars[2] * 1E-6 * (math.log(voltage))**2
+                + pars[3] * 1E-8 * (math.log(voltage))**3) - 273.15
 
 
 def calculateSetpoint(temperature):
@@ -205,11 +215,10 @@ def getWDEData(wde):
     """Read the wde sensor data."""
     data = {}
     if wde.bytes_in_buffer:
-        raw = wde.read().replace(',','.').split(';')
+        raw = wde.read().replace(',', '.').split(';')
         if raw[2+1]:
             data['experiment'] = float(raw[2+1])
         if raw[2+5]:
             data['outside'] = float(raw[2+5])
             data['humidityout'] = float(raw[10+5])
     return data
-

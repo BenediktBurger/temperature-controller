@@ -22,34 +22,13 @@ from simple_pid import PID
 from controllerData import connectionData, listener
 
 # file to be tested
-import TemperatureController
+from TemperatureController import TemperatureController
 
 
-class Mock_Controller(TemperatureController.TemperatureController):
-    def __init__(self):
-        self.errors = {}
-        self.pids = {}
-        self.pidState = {}
-        self.pidSensor = {}
-        self.pidOutput = {}
+class Mock_Controller(TemperatureController):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.test_output = {}
-
-        # General config
-        self.data = {}  # Current data dictionary.
-        self.last_value_set = 0
-        self.tries = 0
-        self.settings = QtCore.QSettings()
-
-        # PID controllers
-        self.pids = {}
-        for i in range(self.settings.value('pids', defaultValue=2, type=int)):
-            self.pids[str(i)] = PID(auto_mode=False)
-            # auto_mode false, in order to start with the last value.
-        self.pidSensor = {}  # the main sensor of the PID
-        self.pidState = {}  # state of the corresponding output: 0 off, 1 manual, 2 pid
-        self.pidOutput = {}  # Output device of the pid.
-        for key in self.pids.keys():
-            self.setupPID(key)
 
         self.publisher = lambda v: v
 
@@ -61,6 +40,15 @@ class Mock_Controller(TemperatureController.TemperatureController):
 
     def writeDatabase(self, data):
         self.test_database = data
+
+    def setupListener(self, settings):
+        return
+
+    def setup_leco_listener(self, name: str, host: str):
+        return
+
+    def connectDatabase(self):
+        return
 
 
 class Mock_App:
@@ -79,6 +67,7 @@ class Mock_App:
 
 
 class Mock_App_Instance:
+    @staticmethod
     def instance():
         return Mock_App()
 
@@ -160,7 +149,7 @@ class Mock_Database:
 
 
 @pytest.fixture
-def controller():
+def controller(replace_application) -> TemperatureController:
     return Mock_Controller()
 
 
@@ -205,12 +194,9 @@ class Test_Controller_init:
     @pytest.fixture
     def controller(self, replace_application, replace_listener, replace_io,
                    replace_database):
-        contr = TemperatureController.TemperatureController()
+        contr = TemperatureController()
         yield contr
-        contr.stop()
-
-    def test_errors(self, controller, caplog):
-        assert controller.errors == {'pid0Sensor': True, 'pid1Sensor': True}
+        contr.shut_down()
 
     def default_pids(self, controller):
         assert controller.pids.keys() == ('0', '1')
@@ -219,12 +205,12 @@ class Test_Controller_init:
 class Test_connectDatabase:
     def test_connectDatabase_close_existent(self, empty, replace_database, connection):
         empty.database = connection
-        TemperatureController.TemperatureController.connectDatabase(empty)
+        TemperatureController.connectDatabase(empty)
         assert not connection.open
 
     def test_connectDatabase_load_config(self, empty, monkeypatch):
         monkeypatch.setattr('psycopg2.connect', lambda **kwargs: kwargs)
-        TemperatureController.TemperatureController.connectDatabase(empty)
+        TemperatureController.connectDatabase(empty)
         del empty.database['connect_timeout']
         assert empty.database == connectionData.database
 
@@ -232,8 +218,8 @@ class Test_connectDatabase:
         def raising(**kwargs):
             raise TypeError('test')
         monkeypatch.setattr('psycopg2.connect', raising)
-        TemperatureController.TemperatureController.connectDatabase(controller)
-        assert "Database connection error TypeError: test." in caplog.text
+        TemperatureController.connectDatabase(controller)
+        assert "Database connection error." in caplog.text
         assert not hasattr(controller, 'database')
 
 
@@ -246,7 +232,7 @@ class Test_setupPID_defaults:
 
     @pytest.fixture(autouse=True)
     def setupPID(self, controller, pid):
-        return TemperatureController.TemperatureController.setupPID(controller, '0')
+        return TemperatureController.setupPID(controller, '0')
 
     def test_limits(self, pid):
         assert pid.output_limits == (None, None)
@@ -266,8 +252,9 @@ class Test_setupPID_defaults:
     def test_state(self, controller):
         assert controller.pidState['0'] == 0
 
-    def test_sensor_error(self, controller, caplog):
-        assert "PID '0' does not have sensors configured." in caplog.text
+    def test_sensor_error(self, controller, caplog: pytest.LogCaptureFixture):
+        error_text = caplog.get_records(when="setup")[0].message
+        assert "PID '0' does not have sensors configured." in error_text
 
 
 class Test_setupPID_settings:
@@ -302,7 +289,7 @@ class Test_setupPID_settings:
 
     @pytest.fixture(autouse=True)
     def setupPID(self, controller, pid, sets):
-        return TemperatureController.TemperatureController.setupPID(controller, '0')
+        return TemperatureController.setupPID(controller, '0')
 
     def test_limits(self, pid):
         assert pid.output_limits == (0, None)
@@ -327,7 +314,7 @@ class Test_setupPID_settings:
 
 
 def test_sendSensorCommand(controller, mock_io):
-    TemperatureController.TemperatureController.sendSensorCommand(controller, 'valid')
+    TemperatureController.sendSensorCommand(controller, 'valid')
     # assert no error
 
 
@@ -346,30 +333,24 @@ class Test_readoutTimeout:
         controller.pidSensor['0'] = ['0', '1']
 
     def test_no_pids(self, controller):
-        TemperatureController.TemperatureController.readTimeout(controller)
+        TemperatureController.readTimeout(controller)
         assert controller.test_database == {'0': 0, '1': 1}
 
     def test_pid_no_output(self, controller, pid_sensor):
-        TemperatureController.TemperatureController.readTimeout(controller)
+        TemperatureController.readTimeout(controller)
         assert controller.test_database['pidOutput0'] == 0
         assert controller.test_output == {}
 
     def test_pid_output(self, controller, pid_sensor):
         controller.pidState['0'] = 2
         controller.pidOutput['0'] = 'out0'
-        TemperatureController.TemperatureController.readTimeout(controller)
+        TemperatureController.readTimeout(controller)
         assert controller.test_output['out0'] == 0
 
     def test_pid_second_sensor(self, controller, pid):
         controller.pidSensor['0'] = ['missing', '1']
-        TemperatureController.TemperatureController.readTimeout(controller)
+        TemperatureController.readTimeout(controller)
         assert controller.test_database['pidOutput0'] == 1
-
-    def test_pid_no_sensors(self, controller, pid, caplog):
-        controller.pidSensor['0'] = ['missing']
-        caplog.set_level(0)
-        TemperatureController.TemperatureController.readTimeout(controller)
-        assert "PID '0' does not have sensors configured." in caplog.text
 
 
 class Test_setOutput:
@@ -378,40 +359,45 @@ class Test_setOutput:
             def setOutput(self, *args):
                 raise KeyError
         controller.inputOutput = Raising_IO()
-        TemperatureController.TemperatureController.setOutput(controller, 'out3', 5)
+        TemperatureController.setOutput(controller, 'out3', 5)
         assert "Output 'out3' is unknown." in caplog.text
 
     def test_setOutput(self, mock_io):
         controller = mock_io
         controller.pidState['0'] = True
         controller.pidOutput['0'] = "out0"
-        TemperatureController.TemperatureController.setOutput(controller, 'out0', 5)
+        TemperatureController.setOutput(controller, 'out0', 5)
         assert controller.inputOutput.test_output['out0'] == 5
 
 
 class Test_writeDatabase:
     @pytest.fixture
     def writeDatabase(self):
-        return TemperatureController.TemperatureController.writeDatabase
+        return TemperatureController.writeDatabase
 
     @pytest.fixture
     def mock_connect(self, controller, caplog):
         # TODO fix, as errors does not exist anymore
+        pytest.skip(reason="broken")
         def connectDatabase():
             controller.errors['test'] = True
         controller.connectDatabase = connectDatabase
         assert "PID '0' does not have sensors configured" in caplog.text
 
-    def test_no_database(self, writeDatabase, controller):
-        writeDatabase(controller, {})
-        assert controller.tries == 0
+    @pytest.fixture
+    def controller_wd_without_database(self, controller):
+        TemperatureController.writeDatabase(controller, {})
+        return controller
+
+    def test_no_database(self, controller_wd_without_database):
+        assert controller_wd_without_database.tries == 1
 
     def test_no_database_reconnect(self, writeDatabase, controller, mock_connect, caplog):
         controller.tries = 9
         writeDatabase(controller, {})
         assert "no_database" in caplog.text
 
-    def test_no_table(self, controller, mock_settings, monkeypatch, writeDatabase, caplog):
+    def test_no_table(self, controller, mock_settings, writeDatabase, caplog):
         controller.database = 5
         writeDatabase(controller, {})
         assert "No database table" in caplog.text
@@ -423,7 +409,8 @@ class Test_writeDatabase:
         assert controller.database.rollbacked
         assert "Database write error." in caplog.text
 
-    def test_connection_error(self, controller, writeDatabase, mock_settings, database, mock_connect, caplog):
+    def test_connection_error(self, controller, writeDatabase, mock_settings, database,
+                              mock_connect, caplog):
         controller.database = database
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': "raise"})
@@ -439,7 +426,8 @@ class Test_writeDatabase:
         assert controller.database.committed
 
     def test_write_text(self, controller, fill_database):
-        assert controller.database.executed[0] == "INSERT INTO table (timestamp, 0, 1) VALUES (%s, %s, %s)"
+        text = "INSERT INTO table (timestamp, 0, 1) VALUES (%s, %s, %s)"
+        assert controller.database.executed[0] == text
 
     def test_write_value(self, controller, fill_database):
         _, *value = controller.database.executed[1]

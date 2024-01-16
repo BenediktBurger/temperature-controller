@@ -12,3 +12,7 @@ database = {'host': "HOST-NAME",  # Host name of the server.
             'user': "USER-NAME",
             'password': "USER-PASSWORD"
             }
+
+# LECO coordinator addres
+# use ":" for a port, for example "example.server:12345"
+leco_coordinator_host_address = "localhost"

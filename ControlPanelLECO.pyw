@@ -6,20 +6,15 @@ created on 23.11.2020 by Benedikt Moneke
 """
 
 # Standard packages.
-try:
-    from PyQt6 import QtCore, QtWidgets, uic
-    from PyQt6.QtCore import pyqtSlot
-    qtVersion = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore, QtWidgets, uic
-    from PyQt5.QtCore import pyqtSlot
-    qtVersion = 5
-import sys
+from argparse import ArgumentParser
+from typing import Any, Dict
 
-from devices import intercom
+from qtpy import QtCore, QtWidgets, uic
+from qtpy.QtCore import Slot as pyqtSlot  # type: ignore
 
 # Local packages.
 from data import Settings
+from data.controller_director import ControllerDirector
 
 
 class ControlPanel(QtWidgets.QMainWindow):
@@ -66,24 +61,26 @@ class ControlPanel(QtWidgets.QMainWindow):
     pbReset: QtWidgets.QPushButton
     pbComponents: QtWidgets.QPushButton
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name="TemperatureControllerPanel", actor="TemperatureController",
+                 host="localhost",
+                 **kwargs):
         # Use initialization of parent class QMainWindow.
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
 
         # Load the user interface file and show it.
-        uic.load_ui.loadUi("data/ControlPanel.ui", self)
+        uic.loadUi("data/ControlPanel.ui", self)
         self.show()
 
         # Get settings.
         application = QtCore.QCoreApplication.instance()
         if application is not None:
             application.setOrganizationName("NLOQO")
-            application.setApplicationName("TemperatureControllerPanel")
+            application.setApplicationName(name)
         self.settings = QtCore.QSettings()
 
         # Dictionaries for changed values
-        self.changedGeneral = {}
-        self.changedPID = {}
+        self.changedGeneral: Dict[str, Any] = {}
+        self.changedPID: Dict[str, Any] = {}
 
         # Connect actions to slots.
         self.actionClose.triggered.connect(self.close)
@@ -123,7 +120,7 @@ class ControlPanel(QtWidgets.QMainWindow):
         self.pbSensors.clicked.connect(self.getSensors)
 
         # Connect to the controller
-        self.connect()
+        self.director = ControllerDirector(actor=actor, name=name, host=host)
 
     @pyqtSlot()
     def closeEvent(self, event):
@@ -139,22 +136,12 @@ class ControlPanel(QtWidgets.QMainWindow):
         settings = Settings.Settings()
         if settings.exec():
             # TODO apply changes to variables
-            self.connect()
             print("settings changed")
-
-    def connect(self):
-        """Create a communicator object."""
-        self.com = intercom.Intercom(self.settings.value('IPaddress',
-                                                         "127.0.0.1", str),
-                                     self.settings.value('port', 22001, int))
 
     def showError(self, exc=None):
         """Show an error message."""
         message = QtWidgets.QMessageBox()
-        if qtVersion == 6:
-            icon = QtWidgets.QMessageBox.Icon.Warning
-        else:
-            icon = QtWidgets.QMessageBox.Warning
+        icon = QtWidgets.QMessageBox.Icon.Warning
         message.setIcon(icon)
         message.setWindowTitle("Communication error")
         message.setText(("A communication error occurred, please check the "
@@ -164,38 +151,29 @@ class ControlPanel(QtWidgets.QMainWindow):
             message.setDetailedText(f"{type(exc).__name__}: {exc}")
         message.exec()
 
-    def sendObject(self, typ, data):
-        """Send an object and handle the errors."""
-        responseTyp, content = self.com.sendObject(typ, data)
-        if responseTyp == 'ERR':
-            raise ConnectionError(content.decode('ascii'))
-        else:
-            return responseTyp, content
-
     # General settings
     @pyqtSlot()
     def getGeneral(self):
         """Get the general settings."""
-        keys = ['database/table', 'readoutInterval']
         try:
-            typ, data = self.sendObject('GET', keys)
+            table = self.director.get_database_table()
+            interval = self.director.get_readout_interval()
         except Exception as exc:
             self.showError(exc)
         else:
-            self.leDatabaseTable.setText(data['database/table'])
+            self.leDatabaseTable.setText(table)
             self.sbReadoutInterval.setValue(
-                5000 if data['readoutInterval'] is None else int(data['readoutInterval']))
+                5000 if interval is None else int(interval * 1000))
 
     @pyqtSlot()
     def setGeneral(self):
         """Set the changed general settings."""
-        if self.changedGeneral != {}:
-            try:
-                self.sendObject('SET', self.changedGeneral)
-            except Exception as exc:
-                self.showError(exc)
-            else:
-                self.changedGeneral.clear()
+        for key, value in self.changedGeneral.items():
+            if key == 'database/table':
+                self.director.set_database_table(self.leDatabaseTable.text())
+            if key == 'readoutInterval':
+                self.director.set_readout_interval(value)
+        self.changedGeneral.clear()
 
     @pyqtSlot()
     def changedDatabaseTable(self):
@@ -211,18 +189,12 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot()
     def setOutput0(self):
         """Set the output to the value of the corresponding spinbox."""
-        try:
-            self.sendObject('CMD', ["out0", self.sbOut0.value()])
-        except Exception as exc:
-            self.showError(exc)
+        self.director.set_output("out0", self.sbOut0.value())
 
     @pyqtSlot()
     def setOutput1(self):
         """Set the output to the value of the corresponding spinbox."""
-        try:
-            self.sendObject('CMD', ["out1", self.sbOut1.value()])
-        except Exception as exc:
-            self.showError(exc)
+        self.director.set_output("out1", self.sbOut1.value())
 
     @pyqtSlot()
     def shutDown(self):
@@ -233,47 +205,40 @@ class ControlPanel(QtWidgets.QMainWindow):
                               "controller? You can not start it with this "
                               "program, but have to do it on the computer "
                               "itself!"))
-        if qtVersion == 6:
-            icon = QtWidgets.QMessageBox.Icon.Question
-            buttons = [QtWidgets.QMessageBox.StandardButton.Yes,
-                       QtWidgets.QMessageBox.StandardButton.Cancel]
-        else:
-            icon = QtWidgets.QMessageBox.Question
-            buttons = [QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.Cancel]
+        icon = QtWidgets.QMessageBox.Icon.Question
+        buttons = QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.Cancel  # noqa
         confirmation.setIcon(icon)
-        confirmation.setStandardButtons(buttons[0] | buttons[1])
-        if confirmation.exec() == buttons[0]:
-            try:
-                self.com.send('OFF')
-            except Exception as exc:
-                self.showError(exc)
+        confirmation.setStandardButtons(buttons)
+        if confirmation.exec() == QtWidgets.QMessageBox.StandardButton.Yes:
+            self.director.shut_down_actor()
 
     # PID values
     @pyqtSlot()
     def getPID(self):
         """Get all the values for the selected PID controller."""
-        name = f"pid{self.bbId.currentText()}"
-        keys = [f"{name}/setpoint", f"{name}/Kp", f"{name}/Ki", f"{name}/Kd",
-                f"{name}/lowerLimit", f"{name}/lowerLimitNone", f"{name}/upperLimit", f"{name}/upperLimitNone",  # noqa: E501
-                f"{name}/sensor", f"{name}/autoMode", f"{name}/lastOutput", f"{name}/state", f"{name}/output"]  # noqa: E501
         try:
-            typ, data = self.sendObject('GET', keys)
+            data = self.director.get_PID_settings(self.bbId.currentText())
         except Exception as exc:
             self.showError(exc)
-        else:
-            self.sbSetpoint.setValue(self.gotToFloat(data[keys[0]]))
-            self.sbKp.setValue(self.gotToFloat(data[keys[1]]))
-            self.sbKi.setValue(self.gotToFloat(data[keys[2]]))
-            self.sbKd.setValue(self.gotToFloat(data[keys[3]]))
-            self.sbLowerLimit.setValue(self.gotToFloat(data[keys[4]]))
-            self.cbLowerLimit.setChecked(False if data[keys[5]] in (False, "0", "false", "False") else True)  # noqa: E501
-            self.sbUpperLimit.setValue(self.gotToFloat(data[keys[6]]))
-            self.cbUpperLimit.setChecked(False if data[keys[7]] in (False, "0", "false", "False") else True)  # noqa: E501
-            self.leSensor.setText(data[keys[8]])
-            self.cbAutoMode.setChecked(False if data[keys[9]] in (False, "0", "false", "False") else True)  # noqa: E501
-            self.sbLastOutput.setValue(self.gotToFloat(data[keys[10]]))
-            self.bbOutput.setCurrentIndex(int(self.gotToFloat(data[keys[11]])))
+            return
+        try:
+            print(data)
+            self.sbSetpoint.setValue(data["setpoint"])
+            self.sbKp.setValue(data["Kp"])
+            self.sbKi.setValue(data["Ki"])
+            self.sbKd.setValue(data["Kd"])
+            self.sbLowerLimit.setValue(data["lowerLimit"])
+            self.cbLowerLimit.setChecked(data["lowerLimitNone"])
+            self.sbUpperLimit.setValue(data["upperLimit"])
+            self.cbUpperLimit.setChecked(data["upperLimitNone"])
+            self.leSensor.setText(", ".join(data["sensors"]))
+            self.cbAutoMode.setChecked(data["autoMode"])
+            self.sbLastOutput.setValue(data["lastOutput"])
+            self.bbOutput.setCurrentIndex(data["state"])
             self.changedPID.clear()  # Reset changed dictionary.
+        except Exception as exc:
+            print(data)
+            self.showError(exc)
 
     def gotToFloat(self, received):
         """Turn a received number into a float."""
@@ -284,13 +249,21 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot()
     def setPID(self):
         """Set the changed values."""
-        if self.changedPID != {}:
-            try:
-                self.sendObject('SET', self.changedPID)
-            except Exception as exc:
-                self.showError(exc)
-            else:
-                self.changedPID.clear()
+        if self.changedPID:
+            print("new values", self.changedPID)  # HACK
+            pid_dicts = {}
+            for key, value in self.changedPID.items():
+                name, par = key.split("/")
+                name = name.replace("pid", "")
+                try:
+                    pid_dicts[name][par] = value
+                except KeyError:
+                    pid_dicts[name] = {par: value}
+            for name, config in pid_dicts.items():
+                try:
+                    self.director.set_PID_settings(name=name, **config)
+                except TypeError as exc:
+                    self.showError(exc)
 
     @pyqtSlot(str)
     def selectPID(self, name):
@@ -322,45 +295,49 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot(float)
     def changedUpperLimit(self, value):
         """Store the upper Limit in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = value
+        if not self.cbUpperLimit.isChecked():
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = value
 
     @pyqtSlot(int)
     def changedUpperLimitNone(self, checked):
         """Store the None value of upper limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = True
+            # self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = True
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = float("inf")
         else:
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = False
-            self.changedPID[f'pid{self.bbId.currentText()}/upperLimit'] = self.sbUpperLimit.value()
+            # self.changedPID[f'pid{self.bbId.currentText()}/upperLimitNone'] = False
+            self.changedPID[f'pid{self.bbId.currentText()}/upper_limit'] = self.sbUpperLimit.value()
 
     @pyqtSlot(float)
     def changedLowerLimit(self, value):
         """Store the lower Limit in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = value
+        if not self.cbLowerLimit.isChecked():
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = value
 
     @pyqtSlot(int)
     def changedLowerLimitNone(self, checked):
         """Store the None value of lower limit"""
         if checked:
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = True
+            # self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = True
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = float("-inf")
         else:
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = False
-            self.changedPID[f'pid{self.bbId.currentText()}/lowerLimit'] = self.sbLowerLimit.value()
+            # self.changedPID[f'pid{self.bbId.currentText()}/lowerLimitNone'] = False
+            self.changedPID[f'pid{self.bbId.currentText()}/lower_limit'] = self.sbLowerLimit.value()
 
     @pyqtSlot()
     def changedSensor(self):
         """Store the Sensor in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/sensor'] = self.leSensor.text()
+        self.changedPID[f'pid{self.bbId.currentText()}/sensors'] = self.leSensor.text().replace(",", " ").split()  # noqa
 
     @pyqtSlot(int)
     def changedAutoMode(self, value):
         """Store the auto mode in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/autoMode'] = value
+        self.changedPID[f'pid{self.bbId.currentText()}/auto_mode'] = value
 
     @pyqtSlot(float)
     def changedLastOutput(self, value):
         """Store the last output in the dictionary."""
-        self.changedPID[f'pid{self.bbId.currentText()}/lastOutput'] = value
+        self.changedPID[f'pid{self.bbId.currentText()}/last_output'] = value
 
     @pyqtSlot(int)
     def changedState(self, value):
@@ -371,19 +348,18 @@ class ControlPanel(QtWidgets.QMainWindow):
     @pyqtSlot()
     def getComponents(self):
         """Show the pid components."""
-        key = f"pid{self.bbId.currentText()}"
         try:
-            typ, data = self.sendObject('CMD', [key, "components"])
+            data = self.director.get_current_PID_state(self.bbId.currentText())
         except Exception as exc:
             self.showError(exc)
         else:
-            self.lbComponents.setText(f"{data[key+'/components']}")
+            self.lbComponents.setText(f"{data}")
 
     @pyqtSlot()
     def resetPID(self):
         """Send a command to reset the PID values of the current controller."""
         try:
-            self.sendObject('CMD', [f"pid{self.bbId.currentText()}", "reset"])
+            self.director.reset_PID(self.bbId.currentText())
         except Exception as exc:
             self.showError(exc)
 
@@ -391,18 +367,17 @@ class ControlPanel(QtWidgets.QMainWindow):
     def getErrors(self):
         """Show the current log as a table."""
         try:
-            typ, data = self.sendObject('GET', ['log'])
-            errors = data['log']
+            log = self.director.get_log()
         except Exception as exc:
             self.showError(exc)
         else:
-            self.lbReadout.setText("\n".join(errors))
+            self.lbReadout.setText("\n".join(log))
 
     @pyqtSlot()
     def clearErrors(self):
         """Clear the remote log, afterwards show the new log."""
         try:
-            typ, data = self.sendObject('DEL', ['log'])
+            self.director.reset_log()
         except Exception as exc:
             self.showError(exc)
         else:
@@ -412,8 +387,7 @@ class ControlPanel(QtWidgets.QMainWindow):
     def getSensors(self):
         """Get the current sensors and values and show them as a table."""
         try:
-            typ, data = self.sendObject('GET', ['data'])
-            sensors = data['data']
+            sensors = self.director.get_current_data()
         except Exception as exc:
             self.showError(exc)
         else:
@@ -423,8 +397,22 @@ class ControlPanel(QtWidgets.QMainWindow):
             self.lbReadout.setText(text)
 
 
-if __name__ == '__main__':  # if this is the started script file
-    """Start the main window if this is the called script file."""
-    app = QtWidgets.QApplication(sys.argv)  # create an application
-    mainwindow = ControlPanel()  # start the first widget, the main window
-    app.exec()  # start the application with its Event loop
+def main() -> None:
+    parser = ArgumentParser(description=ControlPanel.__doc__)
+    parser.add_argument("-r", "--host", help="set the host name of this Node's Coordinator")
+    parser.add_argument("-n", "--name", help="set the application name")
+
+    kwargs = vars(parser.parse_args())
+    for key, value in list(kwargs.items()):
+        # remove not set values
+        if value is None:
+            del kwargs[key]
+
+    application = QtWidgets.QApplication([])
+    panel = ControlPanel(**kwargs)  # noqa: F841
+    application.exec()  # start the event loop
+
+
+if __name__ == "__main__":
+    """If called as a script, start the qt system and start the controller."""
+    main()

@@ -17,9 +17,13 @@ Die einzelnen Schritte sind folgend erklärt.
 
 
 ### Der Controller selbst
+* Python installieren.
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
-* Im Ordner controllerData die Datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die datenbank enthält: `database = {'host': "hostname",...}`. Alternativ kann die Datei *connectionData-sample.py* an die eigenen Bedürfnisse angepasst und umbenannt werden.
-* Im Ordner controllerData die Datei *sensors-sample.py* in *sensors.py* umbenennen und an lokale Bedingungen anpassen: Unter welchem Namen welche Sensoren ausgelesen werden sollen. Dort können auch Offsets etc. definiert werden.
+* Im Ordner controllerData die Datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die Datenbank enthält:
+  `database = {'host': "hostname",...}`.
+  Alternativ kann die Datei *connectionData-sample.py* an die eigenen Bedürfnisse angepasst und umbenannt werden.
+* Im Ordner controllerData die Datei *sensors-sample.py* in *sensors.py* umbenennen und an lokale Bedingungen anpassen: Unter welchem Namen welche Sensoren ausgelesen werden sollen.
+  Dort können auch Offsets etc. definiert werden.
 * Nötige Python Abhängigkeiten installieren: PyQt5/PyQt6.
 * Für die Sensoren: tinkerforge und was man für sonstige Sensoren braucht, zum Beispiel pyvisa für serielle Kommunikation.
 
