@@ -1,0 +1,22 @@
+name: temperature-controller
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - PyQt5
+  - pyvisa
+  - pyvisa-py
+  - psycopg2
+  - qtpy
+  - pyzmq=25.1.2
+  - pip  # don't pin, to gain newest conda compatibility fixes
+  - pip:
+    - simple_pid
+    - tinkerforge
+    # - uuid7==0.1.0
+# Development dependencies below
+  - pytest=7.2.0
+  - pytest-cov=4.1.0
+  - pytest-qt
+  - pytest-runner=6.0.0
+  - setuptools_scm # don't pin, to get newest features

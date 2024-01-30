@@ -5,6 +5,11 @@ authors = [
   { name="Benedikt Burger" },
 ]
 
+requires-python = ">=3.9"
+dependencies = [
+  "numpy",
+]
+
 [tool.black]
 line-length = 100
 
