@@ -8,6 +8,7 @@ authors = [
 requires-python = ">=3.9"
 dependencies = [
   "numpy",
+  "psycopg2",
 ]
 
 [tool.black]
