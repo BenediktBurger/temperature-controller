@@ -9,6 +9,7 @@ requires-python = ">=3.9"
 dependencies = [
   "numpy",
   "psycopg2",
+  "pyqt",
 ]
 
 [tool.black]
