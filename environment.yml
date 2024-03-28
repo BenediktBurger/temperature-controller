@@ -13,7 +13,7 @@ dependencies:
   - pip:
     - simple_pid
     - tinkerforge
-    # - uuid7==0.1.0
+    - pyleco
 # Development dependencies below
   - pytest=7.2.0
   - pytest-cov=4.1.0

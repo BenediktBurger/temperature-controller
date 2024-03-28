@@ -1,7 +1,7 @@
 # Required Python packages
 
 numpy
-# pyleco  # not yet published
+pyleco
 PyQt5
 pytest
 pytest-qt

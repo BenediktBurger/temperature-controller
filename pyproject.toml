@@ -1,16 +1,21 @@
 [project]
 name = "temperature-controller"
-version = "0.0.1.dev"
 authors = [
   { name="Benedikt Burger" },
 ]
+dynamic = ["version"]
 
 requires-python = ">=3.9"
 dependencies = [
   "numpy",
   "psycopg2",
-  "pyqt",
+  "qtpy",
+  "pyleco",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "setuptools_scm>=7.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.black]
 line-length = 100
