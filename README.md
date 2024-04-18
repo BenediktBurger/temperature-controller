@@ -7,7 +7,7 @@ Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TC
 Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Ordner *tests* enthalten sind.
 
 [![DOI](https://zenodo.org/badge/449636011.svg)](https://zenodo.org/doi/10.5281/zenodo.10990975)
-
+[![codecov](https://codecov.io/gh/BenediktBurger/temperature-controller/graph/badge.svg?token=RLA9VZKBPH)](https://codecov.io/gh/BenediktBurger/temperature-controller)
 
 ## Installation
 
