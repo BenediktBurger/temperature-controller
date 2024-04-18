@@ -12,7 +12,6 @@ dependencies:
   - pip  # don't pin, to gain newest conda compatibility fixes
   - pip:
     - simple_pid
-    - tinkerforge
     - pyleco
 # Development dependencies below
   - pytest=7.2.0
