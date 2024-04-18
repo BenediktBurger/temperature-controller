@@ -6,6 +6,8 @@ Es gibt die Steuerung selbst und ein Control Panel, beide kommunizieren über TC
 
 Zur Absicherung der Software, wurden mit pytest Unittests geschrieben, die im Ordner *tests* enthalten sind.
 
+[![DOI](https://zenodo.org/badge/449636011.svg)](https://zenodo.org/doi/10.5281/zenodo.10990975)
+
 
 ## Installation
 
@@ -21,8 +23,8 @@ Die einzelnen Schritte sind folgend erklärt.
 * TemperatureController.py und die Ordner *controllerData* und *devices* müssen auf der Steuerung sein.
 * Im Ordner controllerData die Datei *connectionData.py* anlegen mit einem dictionary, das alle Parameter für die Datenbank enthält:
   `database = {'host': "hostname",...}`.
-  Alternativ kann die Datei *connectionData-sample.py* an die eigenen Bedürfnisse angepasst und umbenannt werden.
-* Im Ordner controllerData die Datei *sensors-sample.py* in *sensors.py* umbenennen und an lokale Bedingungen anpassen: Unter welchem Namen welche Sensoren ausgelesen werden sollen.
+  Alternativ kann die Datei *connectionData_sample.py* an die eigenen Bedürfnisse angepasst und umbenannt werden.
+* Im Ordner controllerData die Datei *sensors_sample.py* in *sensors.py* umbenennen und an lokale Bedingungen anpassen: Unter welchem Namen welche Sensoren ausgelesen werden sollen.
   Dort können auch Offsets etc. definiert werden.
 * Nötige Python Abhängigkeiten installieren: PyQt5/PyQt6.
 * Für die Sensoren: tinkerforge und was man für sonstige Sensoren braucht, zum Beispiel pyvisa für serielle Kommunikation.
