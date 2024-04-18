@@ -33,8 +33,8 @@ sudo pip3 install -r ~/temperature-controller/requirements.txt
 # Copy sample files, if not yet present
 cd ~/temperature-controller/controllerData
 cp temperature-controller.service.template temperature-controller.service
-cp sensors-sample.py sensors.py
-cp connectionData-sample.py connectionData.py
+cp sensors_sample.py sensors.py
+cp connectionData_sample.py connectionData.py
 cd ~
 
 # Autostart configuration.
