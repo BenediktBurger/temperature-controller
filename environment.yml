@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - numpy
-  - PyQt5
+  - pyqt=5.15.7
   - pyvisa
   - pyvisa-py
   - psycopg2
