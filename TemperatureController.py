@@ -39,7 +39,10 @@ for i in range(3):
         break
 
 # local packages
-from controllerData import connectionData    # Data to connect to database.
+try:
+    from controllerData import connectionData    # Data to connect to database.
+except ImportError:
+    from controllerData import connectionData_sample as connectionData
 from controllerData import listener, ioDefinition
 from devices.intercom import Publisher
 

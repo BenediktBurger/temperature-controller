@@ -10,16 +10,16 @@ Created on Sat Jun 19 08:17:59 2021 by Benedikt Moneke
 import pytest
 
 # for fixtures
-try:  # Qt for nice effects.
-    from PyQt6 import QtCore
-    pyqt = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore
-    pyqt = 5
+from qtpy import QtCore
 import psycopg2
 from simple_pid import PID
 
-from controllerData import connectionData, listener
+from controllerData import listener
+from controllerData.ioDefinition import tf
+try:
+    from controllerData import connectionData
+except ImportError:
+    from controllerData import connectionData_sample as connectionData
 
 # file to be tested
 from TemperatureController import TemperatureController
@@ -225,7 +225,7 @@ class Test_connectDatabase:
 
 class Test_setupPID_defaults:
     @pytest.fixture(autouse=True)
-    def pid(self, controller, caplog):
+    def pid(self, controller: TemperatureController, caplog):
         caplog.set_level(0)
         controller.pids['0'] = PID(auto_mode=False)
         return controller.pids['0']
@@ -252,6 +252,7 @@ class Test_setupPID_defaults:
     def test_state(self, controller):
         assert controller.pidState['0'] == 0
 
+    @pytest.mark.skipif(not tf, reason="Tinkerforge missing")
     def test_sensor_error(self, controller, caplog: pytest.LogCaptureFixture):
         error_text = caplog.get_records(when="setup")[0].message
         assert "PID '0' does not have sensors configured." in error_text
@@ -259,7 +260,7 @@ class Test_setupPID_defaults:
 
 class Test_setupPID_settings:
     @pytest.fixture(autouse=True)
-    def pid(self, controller):
+    def pid(self, controller: TemperatureController) -> PID:
         controller.pids['0'] = PID(auto_mode=False)
         return controller.pids['0']
 
@@ -280,36 +281,33 @@ class Test_setupPID_settings:
         settings.setValue('state', 1)
         settings.setValue('sensor', "sensor0, sensor1")
         settings.endGroup()
-        if pyqt == 5:
-            monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
-        if pyqt == 6:
-            monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
+        monkeypatch.setattr('qtpy.QtCore.QSettings', lambda: settings)
         yield
         settings.clear()
 
     @pytest.fixture(autouse=True)
-    def setupPID(self, controller, pid, sets):
+    def setupPID(self, controller: TemperatureController, pid: PID, sets) -> None:
         return TemperatureController.setupPID(controller, '0')
 
-    def test_limits(self, pid):
+    def test_limits(self, pid: PID):
         assert pid.output_limits == (0, None)
 
-    def test_tunings(self, pid):
+    def test_tunings(self, pid: PID):
         assert pid.tunings == (5, 4, 3)  # Kp, Ki, Kd
 
-    def test_setpoint(self, pid):
+    def test_setpoint(self, pid: PID):
         assert pid.setpoint == 15
 
-    def test_auto_mode(self, pid):
+    def test_auto_mode(self, pid: PID):
         assert pid.auto_mode
 
-    def test_integral(self, pid):
-        assert pid._integral == 2
+    def test_integral(self, pid: PID):
+        assert pid._integral == 2  # type: ignore
 
-    def test_state(self, controller):
+    def test_state(self, controller: TemperatureController):
         assert controller.pidState['0'] == 1
 
-    def test_sensor_error(self, controller):
+    def test_sensor_error(self, controller: TemperatureController):
         assert controller.pidSensor['0'] == ["sensor0", "sensor1"]
 
 
@@ -422,7 +420,7 @@ class Test_writeDatabase:
         controller.settings.setValue('database/table', "table")
         writeDatabase(controller, {'0': 0, '1': 1})
 
-    def test_write_commited(self, controller, fill_database):
+    def test_write_committed(self, controller, fill_database):
         assert controller.database.committed
 
     def test_write_text(self, controller, fill_database):

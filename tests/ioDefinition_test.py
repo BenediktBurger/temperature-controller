@@ -269,6 +269,7 @@ def test_setOutput_Not_Connected(skeletonP, caplog):
     assert "Output 'out1' is not connected." in caplog.text
 
 
+@pytest.mark.skipif(not tf, reason="Tinkerforge not installed.")
 def test_setOutput_connection_lost(skeleton):
     skeleton.tfDevices['ao3'] = Mock_BrickletAnalogOutV3()
     skeleton.tfMap['out1'] = 'ao3'
