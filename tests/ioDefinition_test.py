@@ -19,20 +19,20 @@ else:
 
 # file to test
 from controllerData import ioDefinition
+from controllerData.ioDefinition import sensors  # type: ignore
 
 
 ioDefinition.log.addHandler(logging.StreamHandler())
 
 
 class Empty():
-    pass
+    def __init__(self):
+        self.readoutMethods = []
 
 
 @pytest.fixture
 def empty():
-    raw = Empty()
-    raw.readoutMethods = []
-    return raw
+    return Empty()
 
 
 @pytest.fixture
@@ -94,7 +94,9 @@ def mock_tinkerforge(monkeypatch):
     def returner(*args):
         return args
 
-    monkeypatch.setattr(ioDefinition, 'devices', {297: returner, 111: returner, 2115: returner}, False)
+    monkeypatch.setattr(
+        ioDefinition, "devices", {297: returner, 111: returner, 2115: returner}, False
+    )
     monkeypatch.setattr(ioDefinition, "IPConnection", Mock_IPConnection, False)
     monkeypatch.setattr(ioDefinition, 'BrickHAT', Mock_BrickHAT, False)
     monkeypatch.setattr(ioDefinition, 'BrickletAirQuality', Mock_BrickletAirQuality, False)
@@ -104,7 +106,8 @@ def mock_tinkerforge(monkeypatch):
 @pytest.fixture
 def tf_device_pars():
     """Tinkerforge device parameters."""
-    # 0: uid, 1: connected_uid, 2: position, 3: hardware_version, 4: firmware_version, 5: device_identifier, 6: enumeration_type
+    # 0: uid, 1: connected_uid, 2: position, 3: hardware_version, 4: firmware_version,
+    # 5: device_identifier, 6: enumeration_type
     return ["abc", "def", "i", 0, 0, 111, 1]
 
 
@@ -221,21 +224,21 @@ class Test_close:
         ioDefinition.InputOutput.close(skeleton)
         assert skeleton.tfDevices['abc'].args == (0, 0, False, False, False)
 
-    def test_close_sensors(self, empty, monkeypatch, calling):
-        monkeypatch.setattr('controllerData.sensors.close', calling)
+    def test_close_sensors(self, empty, monkeypatch: pytest.MonkeyPatch, calling):
+        monkeypatch.setattr(sensors, 'close', calling)
         ioDefinition.InputOutput.close(empty)
         assert called
 
-    def test_close_sensors_failed(self, skeletonP, monkeypatch, raising):
-        monkeypatch.setattr('controllerData.sensors.close', raising)
+    def test_close_sensors_failed(self, skeletonP, monkeypatch: pytest.MonkeyPatch, raising):
+        monkeypatch.setattr(sensors, 'close', raising)
         ioDefinition.InputOutput.close(skeletonP)
         pass  # TODO test exception log
 
 
 class Test_getSensors:
     @pytest.fixture
-    def sensorsGetData(self, monkeypatch):
-        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {})
+    def sensorsGetData(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(sensors, 'getData', lambda *args: {})
 
     def test_getSensors_Clean(self, empty, sensorsGetData):
         assert ioDefinition.InputOutput.getSensors(empty) == {}
@@ -247,15 +250,15 @@ class Test_getSensors:
         assert skeleton.tfDevices['abc'].args == (30, 1, True, False, True)
 
     def test_call_sensors(self, empty, monkeypatch):
-        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: {'test': True})
+        monkeypatch.setattr(sensors, 'getData', lambda *args: {'test': True})
         assert ioDefinition.InputOutput.getSensors(empty) == {'test': True}
 
     def test_call_sensors_no_dictionary(self, empty, monkeypatch):
-        monkeypatch.setattr('controllerData.sensors.getData', lambda *args: [])
+        monkeypatch.setattr(sensors, 'getData', lambda *args: [])
         assert ioDefinition.InputOutput.getSensors(empty) == {}
 
     def test_call_sensors_failed(self, skeletonP, monkeypatch, raising, caplog):
-        monkeypatch.setattr('controllerData.sensors.getData', raising)
+        monkeypatch.setattr(sensors, 'getData', raising)
         ioDefinition.InputOutput.getSensors(skeletonP)
         assert "Get sensors failed." in caplog.text
 
@@ -281,7 +284,7 @@ class Test_setOutput:
         assert skeleton.tfDevices['ao3'].voltage == 9
 
     def test_external(self, skeleton, monkeypatch, calling):
-        monkeypatch.setattr('controllerData.sensors.setOutput', calling)
+        monkeypatch.setattr(sensors, 'setOutput', calling)
         ioDefinition.InputOutput.setOutput(skeleton, 'out5', 2)
         assert calledArgs == (skeleton, 'out5', 2)
 

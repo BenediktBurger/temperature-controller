@@ -12,7 +12,10 @@ Created on Mon Jun 14 16:25:43 2021 by Benedikt Moneke
 import logging
 from typing import Any
 
-from . import sensors
+try:
+    from . import sensors  # type: ignore
+except ImportError:
+    from . import sensors_sample as sensors
 
 log = logging.getLogger("TemperatureController")
 

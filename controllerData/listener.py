@@ -17,10 +17,10 @@ import socket
 
 try:  # Qt for nice effects.
     from qtpy import QtCore
-    from qtpy.QtCore import Slot as pyqtSlot, Signal as pyqtSignal
+    from qtpy.QtCore import Signal as pyqtSignal
 except ModuleNotFoundError:
     from PyQt5 import QtCore
-    from PyQt5.QtCore import pyqtSlot, pyqtSignal
+    from PyQt5.QtCore import pyqtSignal
 
 from devices import intercom
 
@@ -158,7 +158,7 @@ class ConnectionHandler(QtCore.QRunnable):
             self.signals.pidChanged.emit(key.replace("pid", ""))
         intercom.sendMessage(self.connection, 'ACK')
 
-    def getValue(self, content):
+    def getValue(self, content: bytes) -> None:
         """Get some value."""
         keys = pickle.loads(content)
         assert hasattr(keys, '__iter__'), "The content has to be an iterable."

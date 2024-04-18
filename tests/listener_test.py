@@ -11,12 +11,7 @@ import pytest
 
 # auxiliary for fixtures and tests
 import pickle
-try:  # Qt for nice effects.
-    from PyQt6 import QtCore
-    pyqt = 6
-except ModuleNotFoundError:
-    from PyQt5 import QtCore
-    pyqt = 5
+from qtpy import QtCore
 import socket
 
 from devices import intercom
@@ -82,10 +77,7 @@ def chPP(chP, empty):
 @pytest.fixture
 def sets(monkeypatch):
     settings = QtCore.QSettings('NLOQO', "tests")
-    if pyqt == 5:
-        monkeypatch.setattr('PyQt5.QtCore.QSettings', lambda: settings)
-    if pyqt == 6:
-        monkeypatch.setattr('PyQt6.QtCore.QSettings', lambda: settings)
+    monkeypatch.setattr('qtpy.QtCore.QSettings', lambda: settings)
     yield settings
     settings.clear()
 
@@ -208,7 +200,7 @@ class Test_handler_getValue:
         with pytest.raises(AssertionError):
             ch.getValue(pickle.dumps(5))
 
-    def test_some_value(self, ch, sets):
+    def test_some_value(self, ch: listener.ConnectionHandler, sets):
         sets.setValue('testing', 5)
         ch.getValue(pickle.dumps(["testing"]))
         assert pickle.loads(message[2]) == {'testing': 5}

@@ -23,7 +23,7 @@ Created on Thu Mar  4 13:04:32 2021 by Benedikt Moneke
 import logging
 import pickle
 import socket
-from socket import timeout as timeout
+from socket import timeout as timeout  # noqa: F401
 
 import zmq
 
@@ -66,7 +66,7 @@ validCommands = (
 )
 
 
-def connect(address="127.0.0.1", port=12345, timeout=None):
+def connect(address="127.0.0.1", port=12345, timeout=None) -> socket.socket:  # noqa: F811
     """Create and return a TCP connection to `address` and `port` with `timeout`."""
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(timeout)
@@ -74,11 +74,12 @@ def connect(address="127.0.0.1", port=12345, timeout=None):
     return connection
 
 
-def readMessage(connection):
+def readMessage(connection: socket.socket) -> tuple[str, bytes]:
     """Receive and decode a message. Return `typ` and `content`."""
     headerLength = 3 + 5  # 3 letters for type, 5 for length
     status = 0
     readBuffer = b''
+    typ = ""
     while status < 2:
         read = connection.recv(1064)
         if not read:
@@ -92,9 +93,10 @@ def readMessage(connection):
         if status == 1 and len(readBuffer) >= length:  # Reading message.
             content = readBuffer[:length]
             return typ, content
+    raise TimeoutError
 
 
-def sendMessage(connection, typ, content=b''):
+def sendMessage(connection: socket.socket, typ: str, content: bytes = b'') -> None:
     """Encode and send a message with `typ` and `content`."""
     assert typ in validCommands, "Unknown type"
     header = f"{typ}{len(content):05}".encode('utf-8')
@@ -104,7 +106,7 @@ def sendMessage(connection, typ, content=b''):
 class Intercom:
     """An intercom channel using one-time connections."""
 
-    def __init__(self, address="127.0.0.1", port=12345, timeout=10):
+    def __init__(self, address="127.0.0.1", port=12345, timeout=10):  # noqa: F811
         """Save connection settings."""
         self.address = address, port, timeout
 
