@@ -25,7 +25,8 @@ jobs:
           - name: Python version
             run: python --version
           - name: Test for Coverage
-            run: pytest --cov --cov-report=xml
+            # xvfb for graphical interface
+            run: xvfb-run -a pytest --cov --cov-report=xml
           - name: Upload coverage to Codecov
             uses: codecov/codecov-action@v4
             with:
