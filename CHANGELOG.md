@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [1.2.1] - 2024-04-18
+
+### Fixed
+
+- Fix dependencies in `requirements.txt` and `pyproject.toml`.
+
+
 ## [1.2.0] - 2024-01-16
 
 _For upgrading, install *qtpy* first._
@@ -38,3 +45,9 @@ _For upgrading, install *qtpy* first._
 ## [1.0.0] - 2021-06-18
 
 _Initial release_
+
+
+[1.2.1]: https://github.com/BenediktBurger/temperature-controller/releases/tag/v1.2.1
+[1.2.0]: https://github.com/BenediktBurger/temperature-controller/releases/tag/v1.2.0
+[1.1.0]: https://github.com/BenediktBurger/temperature-controller/releases/tag/v1.1.0
+[1.0.0]: https://github.com/BenediktBurger/temperature-controller/releases/tag/v1.0.0
